@@ -1,7 +1,8 @@
-import { Controller, Post, Body } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { Controller, Post, Body, Get, UseGuards, Request } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
 import { RegisterDto, LoginDto, AuthResponseDto } from './dto';
+import { JwtAuthGuard } from './guards';
 
 @ApiTags('Authentication')
 @Controller('auth')
@@ -30,5 +31,18 @@ export class AuthController {
   @ApiResponse({ status: 401, description: 'Invalid credentials' })
   async login(@Body() loginDto: LoginDto): Promise<AuthResponseDto> {
     return this.authService.login(loginDto);
+  }
+
+  @Get('test-protected')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Test protected route (requires JWT)' })
+  @ApiResponse({ status: 200, description: 'Access granted' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  async testProtected(@Request() req) {
+    return {
+      message: 'Access granted! JWT Guard is working.',
+      user: req.user,
+    };
   }
 }

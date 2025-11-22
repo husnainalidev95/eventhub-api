@@ -13,7 +13,7 @@ export class AuthService {
   constructor(
     private prisma: PrismaService,
     private jwtService: JwtService,
-  ) {}
+  ) { }
 
   private generateToken(userId: string, email: string): string {
     const payload = { sub: userId, email };
