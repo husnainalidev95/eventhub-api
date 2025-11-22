@@ -3,13 +3,22 @@ import {
   ConflictException,
   UnauthorizedException,
 } from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma/prisma.service';
 import { RegisterDto, LoginDto, AuthResponseDto } from './dto';
 import { hashPassword, comparePasswords } from './utils/password.util';
 
 @Injectable()
 export class AuthService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private jwtService: JwtService,
+  ) {}
+
+  private generateToken(userId: string, email: string): string {
+    const payload = { sub: userId, email };
+    return this.jwtService.sign(payload);
+  }
 
   async register(registerDto: RegisterDto): Promise<AuthResponseDto> {
     const { email, password, name, phone } = registerDto;
@@ -39,9 +48,12 @@ export class AuthService {
     // Remove password from response
     const { password: _, ...userWithoutPassword } = user;
 
+    // Generate JWT token
+    const accessToken = this.generateToken(user.id, user.email);
+
     return {
       user: userWithoutPassword,
-      accessToken: 'temp-token', // Will be replaced with JWT in next task
+      accessToken,
     };
   }
 
@@ -67,9 +79,12 @@ export class AuthService {
     // Remove password from response
     const { password: _, ...userWithoutPassword } = user;
 
+    // Generate JWT token
+    const accessToken = this.generateToken(user.id, user.email);
+
     return {
       user: userWithoutPassword,
-      accessToken: 'temp-token', // Will be replaced with JWT in next task
+      accessToken,
     };
   }
 }
