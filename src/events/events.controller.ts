@@ -1,7 +1,7 @@
-import { Controller, Post, Body, UseGuards } from '@nestjs/common';
+import { Controller, Post, Get, Body, Query, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { EventsService } from './events.service';
-import { CreateEventDto, EventResponseDto } from './dto';
+import { CreateEventDto, EventResponseDto, GetEventsQueryDto } from './dto';
 import { JwtAuthGuard, RolesGuard } from '../auth/guards';
 import { CurrentUser, Roles } from '../auth/decorators';
 import { UserRole } from '@prisma/client';
@@ -25,5 +25,32 @@ export class EventsController {
   @ApiResponse({ status: 403, description: 'Forbidden - ORGANIZER role required' })
   async create(@CurrentUser() user: any, @Body() createEventDto: CreateEventDto) {
     return this.eventsService.create(user.id, user.name, createEventDto);
+  }
+
+  @Get()
+  @ApiOperation({ summary: 'Get all events with pagination and filters' })
+  @ApiResponse({
+    status: 200,
+    description: 'Events retrieved successfully',
+    schema: {
+      properties: {
+        data: {
+          type: 'array',
+          items: { type: 'object' },
+        },
+        meta: {
+          type: 'object',
+          properties: {
+            total: { type: 'number' },
+            page: { type: 'number' },
+            limit: { type: 'number' },
+            totalPages: { type: 'number' },
+          },
+        },
+      },
+    },
+  })
+  async findAll(@Query() query: GetEventsQueryDto) {
+    return this.eventsService.findAll(query);
   }
 }
