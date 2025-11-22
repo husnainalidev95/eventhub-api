@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Body, Query, UseGuards } from '@nestjs/common';
+import { Controller, Post, Get, Body, Query, Param, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { EventsService } from './events.service';
 import { CreateEventDto, EventResponseDto, GetEventsQueryDto } from './dto';
@@ -52,5 +52,17 @@ export class EventsController {
   })
   async findAll(@Query() query: GetEventsQueryDto) {
     return this.eventsService.findAll(query);
+  }
+
+  @Get(':id')
+  @ApiOperation({ summary: 'Get event by ID' })
+  @ApiResponse({
+    status: 200,
+    description: 'Event retrieved successfully',
+    type: EventResponseDto,
+  })
+  @ApiResponse({ status: 404, description: 'Event not found' })
+  async findOne(@Param('id') id: string) {
+    return this.eventsService.findOne(id);
   }
 }
