@@ -1,11 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import {
-  IsString,
-  IsDateString,
-  IsOptional,
-  IsEnum,
-  IsBoolean,
-} from 'class-validator';
+import { IsString, IsDateString, IsOptional, IsEnum, IsBoolean } from 'class-validator';
 import { EventStatus } from '@prisma/client';
 
 export class UpdateEventDto {
