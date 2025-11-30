@@ -1,7 +1,7 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { CreateEventDto, GetEventsQueryDto } from './dto';
-import { Prisma } from '@prisma/client';
+import { CreateEventDto, GetEventsQueryDto, UpdateEventDto } from './dto';
+import { Prisma, UserRole } from '@prisma/client';
 
 @Injectable()
 export class EventsService {
@@ -125,5 +125,69 @@ export class EventsService {
     }
 
     return event;
+  }
+
+  async update(id: string, userId: string, userRole: UserRole, updateEventDto: UpdateEventDto) {
+    // First, find the event
+    const event = await this.prisma.event.findUnique({
+      where: { id },
+    });
+
+    if (!event) {
+      throw new NotFoundException(`Event with ID ${id} not found`);
+    }
+
+    // Check if user is owner or admin
+    if (event.organizerId !== userId && userRole !== UserRole.ADMIN) {
+      throw new ForbiddenException('You do not have permission to update this event');
+    }
+
+    // Update the event
+    const updatedEvent = await this.prisma.event.update({
+      where: { id },
+      data: {
+        ...updateEventDto,
+        ...(updateEventDto.date && { date: new Date(updateEventDto.date) }),
+      },
+      include: {
+        ticketTypes: true,
+        organizer: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            companyName: true,
+          },
+        },
+      },
+    });
+
+    return updatedEvent;
+  }
+
+  async remove(id: string, userId: string, userRole: UserRole) {
+    // First, find the event
+    const event = await this.prisma.event.findUnique({
+      where: { id },
+    });
+
+    if (!event) {
+      throw new NotFoundException(`Event with ID ${id} not found`);
+    }
+
+    // Check if user is owner or admin
+    if (event.organizerId !== userId && userRole !== UserRole.ADMIN) {
+      throw new ForbiddenException('You do not have permission to delete this event');
+    }
+
+    // Delete the event (ticket types will be cascade deleted)
+    await this.prisma.event.delete({
+      where: { id },
+    });
+
+    return {
+      message: 'Event successfully deleted',
+      id,
+    };
   }
 }

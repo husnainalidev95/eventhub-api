@@ -1,7 +1,7 @@
-import { Controller, Post, Get, Body, Query, Param, UseGuards } from '@nestjs/common';
+import { Controller, Post, Get, Put, Delete, Body, Query, Param, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { EventsService } from './events.service';
-import { CreateEventDto, EventResponseDto, GetEventsQueryDto } from './dto';
+import { CreateEventDto, UpdateEventDto, EventResponseDto, GetEventsQueryDto } from './dto';
 import { JwtAuthGuard, RolesGuard } from '../auth/guards';
 import { CurrentUser, Roles } from '../auth/decorators';
 import { UserRole } from '@prisma/client';
@@ -64,5 +64,46 @@ export class EventsController {
   @ApiResponse({ status: 404, description: 'Event not found' })
   async findOne(@Param('id') id: string) {
     return this.eventsService.findOne(id);
+  }
+
+  @Put(':id')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Update an event (Owner or Admin only)' })
+  @ApiResponse({
+    status: 200,
+    description: 'Event successfully updated',
+    type: EventResponseDto,
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden - Not owner or admin' })
+  @ApiResponse({ status: 404, description: 'Event not found' })
+  async update(
+    @Param('id') id: string,
+    @CurrentUser() user: any,
+    @Body() updateEventDto: UpdateEventDto,
+  ) {
+    return this.eventsService.update(id, user.id, user.role, updateEventDto);
+  }
+
+  @Delete(':id')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Delete an event (Owner or Admin only)' })
+  @ApiResponse({
+    status: 200,
+    description: 'Event successfully deleted',
+    schema: {
+      properties: {
+        message: { type: 'string' },
+        id: { type: 'string' },
+      },
+    },
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden - Not owner or admin' })
+  @ApiResponse({ status: 404, description: 'Event not found' })
+  async remove(@Param('id') id: string, @CurrentUser() user: any) {
+    return this.eventsService.remove(id, user.id, user.role);
   }
 }
