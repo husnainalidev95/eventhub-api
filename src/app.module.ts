@@ -5,6 +5,8 @@ import { AppService } from './app.service';
 import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './auth/auth.module';
 import { EventsModule } from './events/events.module';
+import { RedisModule } from './redis/redis.module';
+import { BookingsModule } from './bookings/bookings.module';
 
 @Module({
   imports: [
@@ -13,8 +15,10 @@ import { EventsModule } from './events/events.module';
       envFilePath: '.env',
     }),
     PrismaModule,
+    RedisModule,
     AuthModule,
     EventsModule,
+    BookingsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
