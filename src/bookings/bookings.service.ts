@@ -184,6 +184,28 @@ export class BookingsService {
         },
       });
 
+      // Generate tickets for this booking
+      const ticketsData = [];
+      for (let i = 0; i < holdData.quantity; i++) {
+        const ticketCode = this.generateTicketCode();
+        const qrCodeData = this.generateQRCodeData(newBooking.id, ticketCode);
+
+        ticketsData.push({
+          bookingId: newBooking.id,
+          userId: holdData.userId,
+          eventId: holdData.eventId,
+          ticketTypeId: holdData.ticketTypeId,
+          ticketCode,
+          qrCodeData,
+          status: 'VALID',
+        });
+      }
+
+      // Create all tickets
+      await prisma.ticket.createMany({
+        data: ticketsData,
+      });
+
       return newBooking;
     });
 
@@ -308,6 +330,12 @@ export class BookingsService {
         data: { status: 'CANCELLED' },
       });
 
+      // Cancel all tickets for this booking
+      await prisma.ticket.updateMany({
+        where: { bookingId },
+        data: { status: 'CANCELLED' },
+      });
+
       // Restore ticket availability
       await prisma.ticketType.update({
         where: { id: booking.ticketTypeId },
@@ -326,5 +354,21 @@ export class BookingsService {
     const timestamp = Date.now().toString(36).toUpperCase();
     const random = Math.random().toString(36).substring(2, 7).toUpperCase();
     return `BK-${timestamp}-${random}`;
+  }
+
+  private generateTicketCode(): string {
+    const timestamp = Date.now().toString(36).toUpperCase();
+    const random = Math.random().toString(36).substring(2, 7).toUpperCase();
+    return `TIX-${timestamp}-${random}`;
+  }
+
+  private generateQRCodeData(bookingId: string, ticketCode: string): string {
+    // Generate QR code data that includes booking and ticket information
+    // This can be used later to verify tickets at venue
+    return JSON.stringify({
+      bookingId,
+      ticketCode,
+      timestamp: Date.now(),
+    });
   }
 }

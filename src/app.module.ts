@@ -7,6 +7,7 @@ import { AuthModule } from './auth/auth.module';
 import { EventsModule } from './events/events.module';
 import { RedisModule } from './redis/redis.module';
 import { BookingsModule } from './bookings/bookings.module';
+import { TicketsModule } from './tickets/tickets.module';
 
 @Module({
   imports: [
@@ -19,6 +20,7 @@ import { BookingsModule } from './bookings/bookings.module';
     AuthModule,
     EventsModule,
     BookingsModule,
+    TicketsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
