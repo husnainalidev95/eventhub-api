@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
+import { EmailService } from '../email/email.service';
 import { CreateHoldDto } from './dto/create-hold.dto';
 import { HoldResponseDto } from './dto/hold-response.dto';
 import { CreateBookingDto } from './dto/create-booking.dto';
@@ -11,6 +12,7 @@ export class BookingsService {
   constructor(
     private prisma: PrismaService,
     private redis: RedisService,
+    private emailService: EmailService,
   ) {}
 
   async createHold(userId: string, createHoldDto: CreateHoldDto): Promise<HoldResponseDto> {
@@ -212,6 +214,69 @@ export class BookingsService {
     // 6. Release hold from Redis
     await this.redis.releaseHold(holdId);
 
+    // 7. Send booking confirmation and tickets email
+    try {
+      const user = await this.prisma.user.findUnique({
+        where: { id: userId },
+      });
+
+      const tickets = await this.prisma.ticket.findMany({
+        where: { bookingId: booking.id },
+        include: {
+          ticketType: {
+            select: { name: true },
+          },
+        },
+      });
+
+      // Send booking confirmation email
+      await this.emailService.sendBookingConfirmation(user.email, {
+        userName: user.name,
+        bookingCode: booking.bookingCode,
+        eventTitle: booking.event.title,
+        eventDate: new Date(booking.event.date).toLocaleDateString('en-US', {
+          weekday: 'long',
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric',
+        }),
+        eventTime: booking.event.time,
+        eventVenue: booking.event.venue,
+        eventCity: booking.event.city,
+        ticketType: booking.ticketType.name,
+        quantity: booking.quantity,
+        totalAmount: booking.totalAmount,
+      });
+
+      // Send tickets email
+      const event = await this.prisma.event.findUnique({
+        where: { id: booking.eventId },
+      });
+
+      await this.emailService.sendTicketEmail(user.email, {
+        userName: user.name,
+        bookingCode: booking.bookingCode,
+        eventTitle: booking.event.title,
+        eventDate: new Date(booking.event.date).toLocaleDateString('en-US', {
+          weekday: 'long',
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric',
+        }),
+        eventTime: booking.event.time,
+        eventVenue: booking.event.venue,
+        eventAddress: event.address,
+        tickets: tickets.map((t) => ({
+          ticketCode: t.ticketCode,
+          ticketType: t.ticketType.name,
+          qrCodeData: t.qrCodeData,
+        })),
+      });
+    } catch (emailError) {
+      // Log email error but don't fail the booking
+      console.error('Failed to send confirmation emails:', emailError);
+    }
+
     return booking;
   }
 
@@ -346,6 +411,27 @@ export class BookingsService {
         },
       });
     });
+
+    // 5. Send cancellation email
+    try {
+      const user = await this.prisma.user.findUnique({
+        where: { id: userId },
+      });
+
+      const event = await this.prisma.event.findUnique({
+        where: { id: booking.eventId },
+      });
+
+      await this.emailService.sendCancellationEmail(user.email, {
+        userName: user.name,
+        bookingCode: booking.bookingCode,
+        eventTitle: event.title,
+        refundAmount: booking.totalAmount,
+      });
+    } catch (emailError) {
+      // Log email error but don't fail the cancellation
+      console.error('Failed to send cancellation email:', emailError);
+    }
 
     return { message: 'Booking cancelled successfully' };
   }

@@ -8,6 +8,7 @@ import { EventsModule } from './events/events.module';
 import { RedisModule } from './redis/redis.module';
 import { BookingsModule } from './bookings/bookings.module';
 import { TicketsModule } from './tickets/tickets.module';
+import { EmailModule } from './email/email.module';
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { TicketsModule } from './tickets/tickets.module';
     }),
     PrismaModule,
     RedisModule,
+    EmailModule,
     AuthModule,
     EventsModule,
     BookingsModule,
