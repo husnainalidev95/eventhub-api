@@ -24,6 +24,13 @@ enum EventStatus {
   COMPLETED
 }
 
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+}
+
 // User Model
 model User {
   id            String   @id @default(cuid())
@@ -40,7 +47,8 @@ model User {
   companyName   String?
 
   // Relations
-  events Event[]
+  events   Event[]
+  bookings Booking[]
 
   @@map("users")
 }
@@ -68,24 +76,50 @@ model Event {
   // Relations
   organizer   User         @relation(fields: [organizerId], references: [id], onDelete: Cascade)
   ticketTypes TicketType[]
+  bookings    Booking[]
 
   @@map("events")
 }
 
 // TicketType Model
 model TicketType {
-  id          String  @id @default(cuid())
+  id          String   @id @default(cuid())
   eventId     String
   name        String
   price       Float
   total       Int
   available   Int
-  description String? @db.Text
+  description String?  @db.Text
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   // Relations
-  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  event    Event     @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  bookings Booking[]
 
   @@map("ticket_types")
+}
+
+// Booking Model
+model Booking {
+  id            String        @id @default(cuid())
+  userId        String
+  eventId       String
+  ticketTypeId  String
+  quantity      Int
+  totalAmount   Float
+  status        BookingStatus @default(PENDING)
+  holdId        String?       // Reference to Redis hold ID
+  paymentId     String?       // Stripe payment ID (future)
+  paymentStatus String?       // Payment status (future)
+  bookingCode   String        @unique // Unique booking reference
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  // Relations
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  event      Event      @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  ticketType TicketType @relation(fields: [ticketTypeId], references: [id], onDelete: Cascade)
+
+  @@map("bookings")
 }
