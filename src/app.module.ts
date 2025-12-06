@@ -9,6 +9,7 @@ import { RedisModule } from './redis/redis.module';
 import { BookingsModule } from './bookings/bookings.module';
 import { TicketsModule } from './tickets/tickets.module';
 import { EmailModule } from './email/email.module';
+import { UploadModule } from './upload/upload.module';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { EmailModule } from './email/email.module';
     EventsModule,
     BookingsModule,
     TicketsModule,
+    UploadModule,
   ],
   controllers: [AppController],
   providers: [AppService],
