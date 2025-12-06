@@ -6,6 +6,13 @@ import { JwtAuthGuard, RolesGuard } from '../auth/guards';
 import { CurrentUser, Roles } from '../auth/decorators';
 import { UserRole } from '@prisma/client';
 
+interface AuthenticatedUser {
+  id: string;
+  email: string;
+  name: string;
+  role: UserRole;
+}
+
 @ApiTags('Events')
 @Controller('events')
 export class EventsController {
@@ -23,7 +30,7 @@ export class EventsController {
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden - ORGANIZER role required' })
-  async create(@CurrentUser() user: any, @Body() createEventDto: CreateEventDto) {
+  async create(@CurrentUser() user: AuthenticatedUser, @Body() createEventDto: CreateEventDto) {
     return this.eventsService.create(user.id, user.name, createEventDto);
   }
 
@@ -80,7 +87,7 @@ export class EventsController {
   @ApiResponse({ status: 404, description: 'Event not found' })
   async update(
     @Param('id') id: string,
-    @CurrentUser() user: any,
+    @CurrentUser() user: AuthenticatedUser,
     @Body() updateEventDto: UpdateEventDto,
   ) {
     return this.eventsService.update(id, user.id, user.role, updateEventDto);
@@ -103,7 +110,7 @@ export class EventsController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden - Not owner or admin' })
   @ApiResponse({ status: 404, description: 'Event not found' })
-  async remove(@Param('id') id: string, @CurrentUser() user: any) {
+  async remove(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
     return this.eventsService.remove(id, user.id, user.role);
   }
 }

@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Prisma, TicketStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { TicketResponseDto } from './dto/ticket-response.dto';
 
@@ -16,12 +17,12 @@ export class TicketsService {
     const skip = (page - 1) * limit;
 
     // Build where clause
-    const where: any = { userId };
+    const where: Prisma.TicketWhereInput = { userId };
     if (eventId) {
       where.eventId = eventId;
     }
     if (status) {
-      where.status = status;
+      where.status = status as TicketStatus;
     }
 
     const [tickets, total] = await Promise.all([

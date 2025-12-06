@@ -88,7 +88,7 @@ export class RedisService implements OnModuleInit {
   }
 
   // Generic Redis operations
-  async set(key: string, value: any, ttlSeconds?: number): Promise<void> {
+  async set(key: string, value: string | number | Buffer, ttlSeconds?: number): Promise<void> {
     if (ttlSeconds) {
       await this.redis.setex(key, ttlSeconds, JSON.stringify(value));
     } else {

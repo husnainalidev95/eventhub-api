@@ -10,6 +10,7 @@ import { BookingsModule } from './bookings/bookings.module';
 import { TicketsModule } from './tickets/tickets.module';
 import { EmailModule } from './email/email.module';
 import { UploadModule } from './upload/upload.module';
+import { PaymentModule } from './payment/payment.module';
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { UploadModule } from './upload/upload.module';
     BookingsModule,
     TicketsModule,
     UploadModule,
+    PaymentModule,
   ],
   controllers: [AppController],
   providers: [AppService],

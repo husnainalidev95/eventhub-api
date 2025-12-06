@@ -2,6 +2,7 @@ import { Injectable, NotFoundException, BadRequestException } from '@nestjs/comm
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
 import { EmailService } from '../email/email.service';
+import { PaymentService } from '../payment/payment.service';
 import { CreateHoldDto } from './dto/create-hold.dto';
 import { HoldResponseDto } from './dto/hold-response.dto';
 import { CreateBookingDto } from './dto/create-booking.dto';
@@ -13,6 +14,7 @@ export class BookingsService {
     private prisma: PrismaService,
     private redis: RedisService,
     private emailService: EmailService,
+    private paymentService: PaymentService,
   ) {}
 
   async createHold(userId: string, createHoldDto: CreateHoldDto): Promise<HoldResponseDto> {
@@ -348,6 +350,16 @@ export class BookingsService {
             description: true,
           },
         },
+        tickets: {
+          select: {
+            id: true,
+            ticketCode: true,
+            qrCodeData: true,
+            seatNumber: true,
+            status: true,
+            usedAt: true,
+          },
+        },
       },
     });
 
@@ -412,7 +424,19 @@ export class BookingsService {
       });
     });
 
-    // 5. Send cancellation email
+    // 5. Process refund if payment was made
+    if (booking.paymentId && booking.paymentStatus === 'PAID') {
+      try {
+        await this.paymentService.createRefund(booking.paymentId);
+        console.log(`Refund processed for booking ${booking.bookingCode}`);
+      } catch (refundError) {
+        // Log refund error but don't fail the cancellation
+        console.error('Failed to process refund:', refundError);
+        // TODO: Queue refund for retry
+      }
+    }
+
+    // 6. Send cancellation email
     try {
       const user = await this.prisma.user.findUnique({
         where: { id: userId },
