@@ -3,11 +3,14 @@ import {
   Logger,
   BadRequestException,
   InternalServerErrorException,
+  Inject,
+  forwardRef,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import Stripe from 'stripe';
 import { RedisService } from '../redis/redis.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { EventsGateway } from '../events/events.gateway';
 
 @Injectable()
 export class PaymentService {
@@ -19,6 +22,8 @@ export class PaymentService {
     private readonly configService: ConfigService,
     private readonly redisService: RedisService,
     private readonly prisma: PrismaService,
+    @Inject(forwardRef(() => EventsGateway))
+    private readonly eventsGateway: EventsGateway,
   ) {
     const secretKey = this.configService.get<string>('STRIPE_SECRET_KEY');
     this.webhookSecret = this.configService.get<string>('STRIPE_WEBHOOK_SECRET');
@@ -214,6 +219,18 @@ export class PaymentService {
 
       this.logger.log(
         `Booking ${booking.bookingCode} created successfully for payment ${paymentIntent.id}`,
+      );
+
+      // Emit real-time updates
+      this.eventsGateway.emitBookingCreated(userId, booking);
+      
+      const updatedTicketType = await this.prisma.ticketType.findUnique({
+        where: { id: ticketTypeId },
+      });
+      this.eventsGateway.emitTicketAvailabilityUpdate(
+        ticketType.eventId,
+        ticketTypeId,
+        updatedTicketType.available,
       );
 
       // TODO: Send confirmation and ticket emails via EmailService

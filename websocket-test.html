@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebSocket Test - EventHub</title>
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+        }
+        h2 {
+            color: #666;
+            font-size: 18px;
+            margin-top: 0;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        button.disconnect {
+            background: #dc3545;
+        }
+        button.disconnect:hover {
+            background: #c82333;
+        }
+        input {
+            padding: 8px;
+            margin: 5px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            width: 300px;
+        }
+        #status {
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        #status.connected {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        #status.disconnected {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        #events {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 4px;
+            max-height: 400px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+        }
+        .event {
+            padding: 8px;
+            margin: 5px 0;
+            border-left: 3px solid #007bff;
+            background: white;
+        }
+        .event.booking {
+            border-left-color: #28a745;
+        }
+        .event.ticket {
+            border-left-color: #ffc107;
+        }
+        .event.error {
+            border-left-color: #dc3545;
+        }
+    </style>
+</head>
+<body>
+    <h1>🎫 EventHub WebSocket Test Client</h1>
+    
+    <div class="container">
+        <h2>Connection Status</h2>
+        <div id="status" class="disconnected">Disconnected</div>
+        <input type="text" id="token" placeholder="JWT Token (optional)" />
+        <button onclick="connect()">Connect</button>
+        <button class="disconnect" onclick="disconnect()">Disconnect</button>
+    </div>
+
+    <div class="container">
+        <h2>Subscribe to Event</h2>
+        <input type="text" id="eventId" placeholder="Event ID" value="cmiu9py3l0001b9e5mrxak97d" />
+        <button onclick="subscribeToEvent()">Subscribe</button>
+        <button class="disconnect" onclick="unsubscribeFromEvent()">Unsubscribe</button>
+    </div>
+
+    <div class="container">
+        <h2>Subscribe to User Bookings</h2>
+        <button onclick="subscribeToBookings()">Subscribe to My Bookings</button>
+    </div>
+
+    <div class="container">
+        <h2>Real-time Events Log</h2>
+        <button onclick="clearEvents()">Clear Log</button>
+        <div id="events"></div>
+    </div>
+
+    <script>
+        let socket = null;
+        const eventsLog = document.getElementById('events');
+        const statusDiv = document.getElementById('status');
+
+        function addEvent(type, data) {
+            const event = document.createElement('div');
+            event.className = `event ${type}`;
+            event.innerHTML = `
+                <strong>${new Date().toLocaleTimeString()}</strong> - <strong>${type.toUpperCase()}</strong>
+                <pre>${JSON.stringify(data, null, 2)}</pre>
+            `;
+            eventsLog.insertBefore(event, eventsLog.firstChild);
+        }
+
+        function updateStatus(connected) {
+            if (connected) {
+                statusDiv.textContent = 'Connected ✓';
+                statusDiv.className = 'connected';
+            } else {
+                statusDiv.textContent = 'Disconnected ✗';
+                statusDiv.className = 'disconnected';
+            }
+        }
+
+        function connect() {
+            const token = document.getElementById('token').value;
+            
+            socket = io('http://localhost:3001/events', {
+                auth: {
+                    token: token || undefined
+                }
+            });
+
+            socket.on('connect', () => {
+                addEvent('info', { message: 'Connected to WebSocket server', id: socket.id });
+                updateStatus(true);
+            });
+
+            socket.on('disconnect', () => {
+                addEvent('info', { message: 'Disconnected from WebSocket server' });
+                updateStatus(false);
+            });
+
+            socket.on('subscribed', (data) => {
+                addEvent('info', { message: 'Subscribed successfully', data });
+            });
+
+            socket.on('unsubscribed', (data) => {
+                addEvent('info', { message: 'Unsubscribed successfully', data });
+            });
+
+            socket.on('ticket:availability', (data) => {
+                addEvent('ticket', data);
+            });
+
+            socket.on('booking:created', (data) => {
+                addEvent('booking', { type: 'Booking Created', ...data });
+            });
+
+            socket.on('booking:updated', (data) => {
+                addEvent('booking', { type: 'Booking Updated', ...data });
+            });
+
+            socket.on('booking:cancelled', (data) => {
+                addEvent('booking', { type: 'Booking Cancelled', ...data });
+            });
+
+            socket.on('event:updated', (data) => {
+                addEvent('info', { type: 'Event Updated', ...data });
+            });
+
+            socket.on('event:cancelled', (data) => {
+                addEvent('error', { type: 'Event Cancelled', ...data });
+            });
+
+            socket.on('error', (data) => {
+                addEvent('error', data);
+            });
+        }
+
+        function disconnect() {
+            if (socket) {
+                socket.disconnect();
+                socket = null;
+            }
+        }
+
+        function subscribeToEvent() {
+            if (!socket) {
+                alert('Please connect first');
+                return;
+            }
+            const eventId = document.getElementById('eventId').value;
+            socket.emit('subscribe:event', eventId);
+        }
+
+        function unsubscribeFromEvent() {
+            if (!socket) {
+                alert('Please connect first');
+                return;
+            }
+            const eventId = document.getElementById('eventId').value;
+            socket.emit('unsubscribe:event', eventId);
+        }
+
+        function subscribeToBookings() {
+            if (!socket) {
+                alert('Please connect first');
+                return;
+            }
+            socket.emit('subscribe:user:bookings');
+        }
+
+        function clearEvents() {
+            eventsLog.innerHTML = '';
+        }
+
+        // Auto-connect on load
+        window.onload = () => {
+            addEvent('info', { message: 'WebSocket test client loaded. Click Connect to start.' });
+        };
+    </script>
+</body>
+</html>

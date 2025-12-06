@@ -1,8 +1,9 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, Inject, forwardRef } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
 import { EmailService } from '../email/email.service';
 import { PaymentService } from '../payment/payment.service';
+import { EventsGateway } from '../events/events.gateway';
 import { CreateHoldDto } from './dto/create-hold.dto';
 import { HoldResponseDto } from './dto/hold-response.dto';
 import { CreateBookingDto } from './dto/create-booking.dto';
@@ -15,6 +16,8 @@ export class BookingsService {
     private redis: RedisService,
     private emailService: EmailService,
     private paymentService: PaymentService,
+    @Inject(forwardRef(() => EventsGateway))
+    private eventsGateway: EventsGateway,
   ) {}
 
   async createHold(userId: string, createHoldDto: CreateHoldDto): Promise<HoldResponseDto> {
@@ -216,7 +219,15 @@ export class BookingsService {
     // 6. Release hold from Redis
     await this.redis.releaseHold(holdId);
 
-    // 7. Send booking confirmation and tickets email
+    // 7. Emit real-time updates
+    this.eventsGateway.emitBookingCreated(userId, booking);
+    this.eventsGateway.emitTicketAvailabilityUpdate(
+      holdData.eventId,
+      holdData.ticketTypeId,
+      ticketType.available - holdData.quantity,
+    );
+
+    // 8. Send booking confirmation and tickets email
     try {
       const user = await this.prisma.user.findUnique({
         where: { id: userId },
@@ -424,7 +435,20 @@ export class BookingsService {
       });
     });
 
-    // 5. Process refund if payment was made
+    // 5. Emit real-time updates
+    this.eventsGateway.emitBookingCancelled(userId, bookingId);
+    
+    // Get updated ticket type to emit availability
+    const updatedTicketType = await this.prisma.ticketType.findUnique({
+      where: { id: booking.ticketTypeId },
+    });
+    this.eventsGateway.emitTicketAvailabilityUpdate(
+      booking.eventId,
+      booking.ticketTypeId,
+      updatedTicketType.available,
+    );
+
+    // 6. Process refund if payment was made
     if (booking.paymentId && booking.paymentStatus === 'PAID') {
       try {
         await this.paymentService.createRefund(booking.paymentId);
@@ -436,7 +460,7 @@ export class BookingsService {
       }
     }
 
-    // 6. Send cancellation email
+    // 7. Send cancellation email
     try {
       const user = await this.prisma.user.findUnique({
         where: { id: userId },
