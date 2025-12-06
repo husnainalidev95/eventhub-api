@@ -6,6 +6,8 @@ import {
   IsArray,
   ValidateNested,
   ArrayMinSize,
+  IsUrl,
+  Matches,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { CreateTicketTypeDto } from './create-ticket-type.dto';
@@ -27,12 +29,15 @@ export class CreateEventDto {
   category: string;
 
   @ApiProperty({
-    example: 'https://example.com/image.jpg',
-    description: 'Event image URL',
+    example: 'https://res.cloudinary.com/your-cloud/image/upload/v123456789/eventhub/events/abc123.jpg',
+    description: 'Event image URL (must be from Cloudinary)',
     required: false,
   })
   @IsOptional()
-  @IsString()
+  @IsUrl({}, { message: 'Image must be a valid URL' })
+  @Matches(/^https:\/\/res\.cloudinary\.com\/.+/, {
+    message: 'Image must be a valid Cloudinary URL',
+  })
   image?: string;
 
   @ApiProperty({ example: '2025-08-15', description: 'Event date (ISO format)' })

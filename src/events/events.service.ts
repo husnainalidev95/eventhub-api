@@ -1,11 +1,18 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { UploadService } from '../upload/upload.service';
 import { CreateEventDto, GetEventsQueryDto, UpdateEventDto } from './dto';
 import { Prisma, UserRole } from '@prisma/client';
+import { DEFAULT_EVENT_IMAGE } from '../common/constants';
 
 @Injectable()
 export class EventsService {
-  constructor(private prisma: PrismaService) {}
+  private readonly logger = new Logger(EventsService.name);
+
+  constructor(
+    private prisma: PrismaService,
+    private uploadService: UploadService,
+  ) {}
 
   async create(userId: string, userName: string, createEventDto: CreateEventDto) {
     const { ticketTypes, ...eventData } = createEventDto;
@@ -13,6 +20,7 @@ export class EventsService {
     const event = await this.prisma.event.create({
       data: {
         ...eventData,
+        image: eventData.image || DEFAULT_EVENT_IMAGE, // Use default if no image provided
         date: new Date(eventData.date),
         organizerId: userId,
         organizerName: userName,
@@ -142,6 +150,20 @@ export class EventsService {
       throw new ForbiddenException('You do not have permission to update this event');
     }
 
+    // If updating image and old image exists, delete old image from Cloudinary
+    if (updateEventDto.image && event.image && updateEventDto.image !== event.image) {
+      // Don't delete default placeholder image
+      if (event.image !== DEFAULT_EVENT_IMAGE) {
+        this.logger.log(`Deleting old event image: ${event.image}`);
+        const deleteResult = await this.uploadService.deleteImage(event.image);
+        if (deleteResult.success) {
+          this.logger.log('Old event image deleted successfully');
+        } else {
+          this.logger.warn(`Failed to delete old image: ${deleteResult.message}`);
+        }
+      }
+    }
+
     // Update the event
     const updatedEvent = await this.prisma.event.update({
       where: { id },
@@ -178,6 +200,17 @@ export class EventsService {
     // Check if user is owner or admin
     if (event.organizerId !== userId && userRole !== UserRole.ADMIN) {
       throw new ForbiddenException('You do not have permission to delete this event');
+    }
+
+    // Delete event image from Cloudinary if exists (don't delete default placeholder)
+    if (event.image && event.image !== DEFAULT_EVENT_IMAGE) {
+      this.logger.log(`Deleting event image: ${event.image}`);
+      const deleteResult = await this.uploadService.deleteImage(event.image);
+      if (deleteResult.success) {
+        this.logger.log('Event image deleted successfully from Cloudinary');
+      } else {
+        this.logger.warn(`Failed to delete image: ${deleteResult.message}`);
+      }
     }
 
     // Delete the event (ticket types will be cascade deleted)

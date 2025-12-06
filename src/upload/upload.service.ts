@@ -69,6 +69,68 @@ export class UploadService {
   }
 
   /**
+   * Delete image from Cloudinary by URL
+   */
+  async deleteImage(imageUrl: string): Promise<{ success: boolean; message: string }> {
+    if (!this.cloudinaryConfigured) {
+      this.logger.warn('Cloudinary not configured. Skipping image deletion.');
+      return { success: true, message: 'Image deletion skipped (Cloudinary not configured)' };
+    }
+
+    if (!imageUrl) {
+      return { success: true, message: 'No image to delete' };
+    }
+
+    try {
+      // Extract publicId from Cloudinary URL
+      // URL format: https://res.cloudinary.com/{cloud_name}/image/upload/v{version}/{publicId}.{format}
+      const publicId = this.extractPublicIdFromUrl(imageUrl);
+
+      if (!publicId) {
+        this.logger.warn(`Could not extract publicId from URL: ${imageUrl}`);
+        return { success: false, message: 'Invalid Cloudinary URL' };
+      }
+
+      // Delete image from Cloudinary
+      const result = await cloudinary.uploader.destroy(publicId);
+
+      if (result.result === 'ok') {
+        this.logger.log(`Image deleted successfully: ${publicId}`);
+        return { success: true, message: 'Image deleted successfully' };
+      } else if (result.result === 'not found') {
+        this.logger.warn(`Image not found in Cloudinary: ${publicId}`);
+        return { success: true, message: 'Image not found (may have been already deleted)' };
+      } else {
+        this.logger.warn(`Failed to delete image: ${publicId}`, result);
+        return { success: false, message: 'Failed to delete image' };
+      }
+    } catch (error) {
+      this.logger.error(`Error deleting image: ${error.message}`);
+      return { success: false, message: `Error deleting image: ${error.message}` };
+    }
+  }
+
+  /**
+   * Extract public_id from Cloudinary URL
+   */
+  private extractPublicIdFromUrl(url: string): string | null {
+    try {
+      // Match pattern: https://res.cloudinary.com/{cloud_name}/image/upload/v{version}/{folder}/{filename}.{ext}
+      const regex = /\/upload\/(?:v\d+\/)?(.+)\.\w+$/;
+      const match = url.match(regex);
+
+      if (match && match[1]) {
+        return match[1]; // Returns: eventhub/events/abc123 or eventhub/avatars/xyz789
+      }
+
+      return null;
+    } catch (error) {
+      this.logger.error(`Error extracting publicId from URL: ${error.message}`);
+      return null;
+    }
+  }
+
+  /**
    * Upload image to Cloudinary
    */
   private async uploadToCloudinary(
