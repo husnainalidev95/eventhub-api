@@ -3,9 +3,10 @@ import { BookingsController } from './bookings.controller';
 import { BookingsService } from './bookings.service';
 import { PaymentModule } from '../payment/payment.module';
 import { EventsModule } from '../events/events.module';
+import { QueuesModule } from '../queues/queues.module';
 
 @Module({
-  imports: [PaymentModule, forwardRef(() => EventsModule)],
+  imports: [PaymentModule, forwardRef(() => EventsModule), QueuesModule],
   controllers: [BookingsController],
   providers: [BookingsService],
 })

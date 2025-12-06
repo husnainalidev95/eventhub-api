@@ -11,6 +11,7 @@ import { TicketsModule } from './tickets/tickets.module';
 import { EmailModule } from './email/email.module';
 import { UploadModule } from './upload/upload.module';
 import { PaymentModule } from './payment/payment.module';
+import { QueuesModule } from './queues/queues.module';
 
 @Module({
   imports: [
@@ -27,6 +28,7 @@ import { PaymentModule } from './payment/payment.module';
     TicketsModule,
     UploadModule,
     PaymentModule,
+    QueuesModule,
   ],
   controllers: [AppController],
   providers: [AppService],

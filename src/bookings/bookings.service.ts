@@ -1,4 +1,12 @@
-import { Injectable, NotFoundException, BadRequestException, Inject, forwardRef } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  Inject,
+  forwardRef,
+} from '@nestjs/common';
+import { InjectQueue } from '@nestjs/bull';
+import { Queue } from 'bullmq';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
 import { EmailService } from '../email/email.service';
@@ -8,6 +16,11 @@ import { CreateHoldDto } from './dto/create-hold.dto';
 import { HoldResponseDto } from './dto/hold-response.dto';
 import { CreateBookingDto } from './dto/create-booking.dto';
 import { BookingResponseDto } from './dto/booking-response.dto';
+import {
+  BookingConfirmationEmailJob,
+  TicketsEmailJob,
+  CancellationEmailJob,
+} from '../queues/processors/email.processor';
 
 @Injectable()
 export class BookingsService {
@@ -18,6 +31,7 @@ export class BookingsService {
     private paymentService: PaymentService,
     @Inject(forwardRef(() => EventsGateway))
     private eventsGateway: EventsGateway,
+    @InjectQueue('email') private emailQueue: Queue,
   ) {}
 
   async createHold(userId: string, createHoldDto: CreateHoldDto): Promise<HoldResponseDto> {
@@ -227,10 +241,14 @@ export class BookingsService {
       ticketType.available - holdData.quantity,
     );
 
-    // 8. Send booking confirmation and tickets email
+    // 8. Send booking confirmation and tickets email (via queue)
     try {
       const user = await this.prisma.user.findUnique({
         where: { id: userId },
+      });
+
+      const event = await this.prisma.event.findUnique({
+        where: { id: booking.eventId },
       });
 
       const tickets = await this.prisma.ticket.findMany({
@@ -242,52 +260,54 @@ export class BookingsService {
         },
       });
 
-      // Send booking confirmation email
-      await this.emailService.sendBookingConfirmation(user.email, {
-        userName: user.name,
-        bookingCode: booking.bookingCode,
-        eventTitle: booking.event.title,
-        eventDate: new Date(booking.event.date).toLocaleDateString('en-US', {
-          weekday: 'long',
-          year: 'numeric',
-          month: 'long',
-          day: 'numeric',
-        }),
-        eventTime: booking.event.time,
-        eventVenue: booking.event.venue,
-        eventCity: booking.event.city,
-        ticketType: booking.ticketType.name,
-        quantity: booking.quantity,
-        totalAmount: booking.totalAmount,
-      });
+      // Queue booking confirmation email
+      await this.emailQueue.add('booking-confirmation', {
+        email: user.email,
+        data: {
+          userName: user.name,
+          bookingCode: booking.bookingCode,
+          eventTitle: booking.event.title,
+          eventDate: new Date(booking.event.date).toLocaleDateString('en-US', {
+            weekday: 'long',
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+          }),
+          eventTime: booking.event.time,
+          eventVenue: booking.event.venue,
+          eventCity: booking.event.city,
+          ticketType: booking.ticketType.name,
+          quantity: booking.quantity,
+          totalAmount: booking.totalAmount,
+        },
+      } as BookingConfirmationEmailJob);
 
-      // Send tickets email
-      const event = await this.prisma.event.findUnique({
-        where: { id: booking.eventId },
-      });
-
-      await this.emailService.sendTicketEmail(user.email, {
-        userName: user.name,
-        bookingCode: booking.bookingCode,
-        eventTitle: booking.event.title,
-        eventDate: new Date(booking.event.date).toLocaleDateString('en-US', {
-          weekday: 'long',
-          year: 'numeric',
-          month: 'long',
-          day: 'numeric',
-        }),
-        eventTime: booking.event.time,
-        eventVenue: booking.event.venue,
-        eventAddress: event.address,
-        tickets: tickets.map((t) => ({
-          ticketCode: t.ticketCode,
-          ticketType: t.ticketType.name,
-          qrCodeData: t.qrCodeData,
-        })),
-      });
+      // Queue tickets email
+      await this.emailQueue.add('tickets', {
+        email: user.email,
+        data: {
+          userName: user.name,
+          bookingCode: booking.bookingCode,
+          eventTitle: booking.event.title,
+          eventDate: new Date(booking.event.date).toLocaleDateString('en-US', {
+            weekday: 'long',
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+          }),
+          eventTime: booking.event.time,
+          eventVenue: booking.event.venue,
+          eventAddress: event.address,
+          tickets: tickets.map((t) => ({
+            ticketCode: t.ticketCode,
+            ticketType: t.ticketType.name,
+            qrCodeData: t.qrCodeData,
+          })),
+        },
+      } as TicketsEmailJob);
     } catch (emailError) {
-      // Log email error but don't fail the booking
-      console.error('Failed to send confirmation emails:', emailError);
+      // Log email queue error but don't fail the booking
+      console.error('Failed to queue confirmation emails:', emailError);
     }
 
     return booking;
@@ -437,7 +457,7 @@ export class BookingsService {
 
     // 5. Emit real-time updates
     this.eventsGateway.emitBookingCancelled(userId, bookingId);
-    
+
     // Get updated ticket type to emit availability
     const updatedTicketType = await this.prisma.ticketType.findUnique({
       where: { id: booking.ticketTypeId },
@@ -460,7 +480,7 @@ export class BookingsService {
       }
     }
 
-    // 7. Send cancellation email
+    // 7. Send cancellation email (via queue)
     try {
       const user = await this.prisma.user.findUnique({
         where: { id: userId },
@@ -470,15 +490,18 @@ export class BookingsService {
         where: { id: booking.eventId },
       });
 
-      await this.emailService.sendCancellationEmail(user.email, {
-        userName: user.name,
-        bookingCode: booking.bookingCode,
-        eventTitle: event.title,
-        refundAmount: booking.totalAmount,
-      });
+      await this.emailQueue.add('cancellation', {
+        email: user.email,
+        data: {
+          userName: user.name,
+          bookingCode: booking.bookingCode,
+          eventTitle: event.title,
+          refundAmount: booking.totalAmount,
+        },
+      } as CancellationEmailJob);
     } catch (emailError) {
-      // Log email error but don't fail the cancellation
-      console.error('Failed to send cancellation email:', emailError);
+      // Log email queue error but don't fail the cancellation
+      console.error('Failed to queue cancellation email:', emailError);
     }
 
     return { message: 'Booking cancelled successfully' };
