@@ -29,7 +29,8 @@ export class CreateEventDto {
   category: string;
 
   @ApiProperty({
-    example: 'https://res.cloudinary.com/your-cloud/image/upload/v123456789/eventhub/events/abc123.jpg',
+    example:
+      'https://res.cloudinary.com/your-cloud/image/upload/v123456789/eventhub/events/abc123.jpg',
     description: 'Event image URL (must be from Cloudinary)',
     required: false,
   })

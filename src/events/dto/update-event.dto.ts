@@ -1,5 +1,13 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsString, IsDateString, IsOptional, IsEnum, IsBoolean, IsUrl, Matches } from 'class-validator';
+import {
+  IsString,
+  IsDateString,
+  IsOptional,
+  IsEnum,
+  IsBoolean,
+  IsUrl,
+  Matches,
+} from 'class-validator';
 import { EventStatus } from '@prisma/client';
 
 export class UpdateEventDto {
@@ -27,7 +35,8 @@ export class UpdateEventDto {
   category?: string;
 
   @ApiProperty({
-    example: 'https://res.cloudinary.com/your-cloud/image/upload/v123456789/eventhub/events/abc123.jpg',
+    example:
+      'https://res.cloudinary.com/your-cloud/image/upload/v123456789/eventhub/events/abc123.jpg',
     description: 'Event image URL (must be from Cloudinary)',
     required: false,
   })

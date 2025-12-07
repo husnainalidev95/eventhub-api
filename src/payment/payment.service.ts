@@ -223,7 +223,7 @@ export class PaymentService {
 
       // Emit real-time updates
       this.eventsGateway.emitBookingCreated(userId, booking);
-      
+
       const updatedTicketType = await this.prisma.ticketType.findUnique({
         where: { id: ticketTypeId },
       });

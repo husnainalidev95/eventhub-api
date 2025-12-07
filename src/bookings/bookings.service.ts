@@ -21,11 +21,17 @@ import {
   TicketsEmailJob,
   CancellationEmailJob,
 } from '../queues/processors/email.processor';
+import { BookingsRepository } from './bookings.repository';
+import { TicketTypesRepository } from './ticket-types.repository';
+import { TicketsRepository } from './tickets.repository';
 
 @Injectable()
 export class BookingsService {
   constructor(
     private prisma: PrismaService,
+    private bookingsRepository: BookingsRepository,
+    private ticketTypesRepository: TicketTypesRepository,
+    private ticketsRepository: TicketsRepository,
     private redis: RedisService,
     private emailService: EmailService,
     private paymentService: PaymentService,
@@ -51,9 +57,7 @@ export class BookingsService {
     }
 
     // 2. Verify ticket type exists and belongs to this event
-    const ticketType = await this.prisma.ticketType.findUnique({
-      where: { id: ticketTypeId },
-    });
+    const ticketType = await this.ticketTypesRepository.findById(ticketTypeId);
 
     if (!ticketType || ticketType.eventId !== eventId) {
       throw new NotFoundException('Ticket type not found for this event');
@@ -145,9 +149,7 @@ export class BookingsService {
     }
 
     // 3. Verify ticket availability (double-check)
-    const ticketType = await this.prisma.ticketType.findUnique({
-      where: { id: holdData.ticketTypeId },
-    });
+    const ticketType = await this.ticketTypesRepository.findById(holdData.ticketTypeId);
 
     if (!ticketType) {
       throw new NotFoundException('Ticket type not found');
@@ -162,48 +164,29 @@ export class BookingsService {
 
     // 5. Create booking and update ticket availability in transaction
     const booking = await this.prisma.$transaction(async (prisma) => {
+      const context = { trxPrisma: prisma as any };
+
       // Create booking
-      const newBooking = await prisma.booking.create({
-        data: {
-          userId: holdData.userId,
-          eventId: holdData.eventId,
-          ticketTypeId: holdData.ticketTypeId,
+      const newBooking = await this.bookingsRepository.create(
+        {
+          user: { connect: { id: holdData.userId } },
+          event: { connect: { id: holdData.eventId } },
+          ticketType: { connect: { id: holdData.ticketTypeId } },
           quantity: holdData.quantity,
           totalAmount: ticketType.price * holdData.quantity,
           status: 'CONFIRMED',
           holdId: holdId,
           bookingCode: bookingCode,
         },
-        include: {
-          event: {
-            select: {
-              id: true,
-              title: true,
-              date: true,
-              time: true,
-              venue: true,
-              city: true,
-            },
-          },
-          ticketType: {
-            select: {
-              id: true,
-              name: true,
-              price: true,
-            },
-          },
-        },
-      });
+        context,
+      );
 
       // Update ticket availability
-      await prisma.ticketType.update({
-        where: { id: holdData.ticketTypeId },
-        data: {
-          available: {
-            decrement: holdData.quantity,
-          },
-        },
-      });
+      await this.ticketTypesRepository.decrementAvailable(
+        holdData.ticketTypeId,
+        holdData.quantity,
+        context,
+      );
 
       // Generate tickets for this booking
       const ticketsData = [];
@@ -223,9 +206,7 @@ export class BookingsService {
       }
 
       // Create all tickets
-      await prisma.ticket.createMany({
-        data: ticketsData,
-      });
+      await this.ticketsRepository.createMany(ticketsData, context);
 
       return newBooking;
     });
@@ -233,31 +214,29 @@ export class BookingsService {
     // 6. Release hold from Redis
     await this.redis.releaseHold(holdId);
 
-    // 7. Emit real-time updates
-    this.eventsGateway.emitBookingCreated(userId, booking);
+    // 7. Fetch complete booking with relations
+    const completeBooking = await this.bookingsRepository.findById(booking.id);
+
+    // 8. Emit real-time updates
+    this.eventsGateway.emitBookingCreated(userId, completeBooking);
     this.eventsGateway.emitTicketAvailabilityUpdate(
       holdData.eventId,
       holdData.ticketTypeId,
       ticketType.available - holdData.quantity,
     );
 
-    // 8. Send booking confirmation and tickets email (via queue)
+    // 9. Send booking confirmation and tickets email (via queue)
     try {
       const user = await this.prisma.user.findUnique({
         where: { id: userId },
       });
 
       const event = await this.prisma.event.findUnique({
-        where: { id: booking.eventId },
+        where: { id: completeBooking.eventId },
       });
 
-      const tickets = await this.prisma.ticket.findMany({
-        where: { bookingId: booking.id },
-        include: {
-          ticketType: {
-            select: { name: true },
-          },
-        },
+      const tickets = await this.ticketsRepository.findAll({
+        bookingId: completeBooking.id,
       });
 
       // Queue booking confirmation email
@@ -265,20 +244,20 @@ export class BookingsService {
         email: user.email,
         data: {
           userName: user.name,
-          bookingCode: booking.bookingCode,
-          eventTitle: booking.event.title,
-          eventDate: new Date(booking.event.date).toLocaleDateString('en-US', {
+          bookingCode: completeBooking.bookingCode,
+          eventTitle: completeBooking.event.title,
+          eventDate: new Date(completeBooking.event.date).toLocaleDateString('en-US', {
             weekday: 'long',
             year: 'numeric',
             month: 'long',
             day: 'numeric',
           }),
-          eventTime: booking.event.time,
-          eventVenue: booking.event.venue,
-          eventCity: booking.event.city,
-          ticketType: booking.ticketType.name,
-          quantity: booking.quantity,
-          totalAmount: booking.totalAmount,
+          eventTime: completeBooking.event.time,
+          eventVenue: completeBooking.event.venue,
+          eventCity: completeBooking.event.city,
+          ticketType: completeBooking.ticketType.name,
+          quantity: completeBooking.quantity,
+          totalAmount: completeBooking.totalAmount,
         },
       } as BookingConfirmationEmailJob);
 
@@ -287,16 +266,16 @@ export class BookingsService {
         email: user.email,
         data: {
           userName: user.name,
-          bookingCode: booking.bookingCode,
-          eventTitle: booking.event.title,
-          eventDate: new Date(booking.event.date).toLocaleDateString('en-US', {
+          bookingCode: completeBooking.bookingCode,
+          eventTitle: completeBooking.event.title,
+          eventDate: new Date(completeBooking.event.date).toLocaleDateString('en-US', {
             weekday: 'long',
             year: 'numeric',
             month: 'long',
             day: 'numeric',
           }),
-          eventTime: booking.event.time,
-          eventVenue: booking.event.venue,
+          eventTime: completeBooking.event.time,
+          eventVenue: completeBooking.event.venue,
           eventAddress: event.address,
           tickets: tickets.map((t) => ({
             ticketCode: t.ticketCode,
@@ -310,40 +289,19 @@ export class BookingsService {
       console.error('Failed to queue confirmation emails:', emailError);
     }
 
-    return booking;
+    return completeBooking;
   }
 
   async getUserBookings(userId: string, page: number = 1, limit: number = 10) {
     const skip = (page - 1) * limit;
 
     const [bookings, total] = await Promise.all([
-      this.prisma.booking.findMany({
-        where: { userId },
-        include: {
-          event: {
-            select: {
-              id: true,
-              title: true,
-              date: true,
-              time: true,
-              venue: true,
-              city: true,
-              image: true,
-            },
-          },
-          ticketType: {
-            select: {
-              id: true,
-              name: true,
-              price: true,
-            },
-          },
-        },
-        orderBy: { createdAt: 'desc' },
+      this.bookingsRepository.findAll({
+        userId,
         skip,
         take: limit,
       }),
-      this.prisma.booking.count({ where: { userId } }),
+      this.bookingsRepository.count({ userId }),
     ]);
 
     return {
@@ -358,41 +316,7 @@ export class BookingsService {
   }
 
   async getBookingById(bookingId: string, userId: string): Promise<BookingResponseDto> {
-    const booking = await this.prisma.booking.findUnique({
-      where: { id: bookingId },
-      include: {
-        event: {
-          select: {
-            id: true,
-            title: true,
-            date: true,
-            time: true,
-            venue: true,
-            city: true,
-            address: true,
-            image: true,
-          },
-        },
-        ticketType: {
-          select: {
-            id: true,
-            name: true,
-            price: true,
-            description: true,
-          },
-        },
-        tickets: {
-          select: {
-            id: true,
-            ticketCode: true,
-            qrCodeData: true,
-            seatNumber: true,
-            status: true,
-            usedAt: true,
-          },
-        },
-      },
-    });
+    const booking = await this.bookingsRepository.findById(bookingId);
 
     if (!booking) {
       throw new NotFoundException('Booking not found');
@@ -408,9 +332,7 @@ export class BookingsService {
 
   async cancelBooking(bookingId: string, userId: string): Promise<{ message: string }> {
     // 1. Get booking
-    const booking = await this.prisma.booking.findUnique({
-      where: { id: bookingId },
-    });
+    const booking = await this.bookingsRepository.findById(bookingId);
 
     if (!booking) {
       throw new NotFoundException('Booking not found');
@@ -432,36 +354,27 @@ export class BookingsService {
 
     // 4. Cancel booking and restore ticket availability in transaction
     await this.prisma.$transaction(async (prisma) => {
+      const context = { trxPrisma: prisma as any };
+
       // Update booking status
-      await prisma.booking.update({
-        where: { id: bookingId },
-        data: { status: 'CANCELLED' },
-      });
+      await this.bookingsRepository.updateStatus(bookingId, 'CANCELLED', context);
 
       // Cancel all tickets for this booking
-      await prisma.ticket.updateMany({
-        where: { bookingId },
-        data: { status: 'CANCELLED' },
-      });
+      await this.ticketsRepository.updateMany({ bookingId }, { status: 'CANCELLED' }, context);
 
       // Restore ticket availability
-      await prisma.ticketType.update({
-        where: { id: booking.ticketTypeId },
-        data: {
-          available: {
-            increment: booking.quantity,
-          },
-        },
-      });
+      await this.ticketTypesRepository.incrementAvailable(
+        booking.ticketTypeId,
+        booking.quantity,
+        context,
+      );
     });
 
     // 5. Emit real-time updates
     this.eventsGateway.emitBookingCancelled(userId, bookingId);
 
     // Get updated ticket type to emit availability
-    const updatedTicketType = await this.prisma.ticketType.findUnique({
-      where: { id: booking.ticketTypeId },
-    });
+    const updatedTicketType = await this.ticketTypesRepository.findById(booking.ticketTypeId);
     this.eventsGateway.emitTicketAvailabilityUpdate(
       booking.eventId,
       booking.ticketTypeId,

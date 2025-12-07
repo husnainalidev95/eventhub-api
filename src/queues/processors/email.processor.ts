@@ -85,7 +85,7 @@ export class EmailProcessor {
   async handleBookingConfirmation(job: Job<BookingConfirmationEmailJob>) {
     const { email, data } = job.data;
     this.logger.log(`Sending booking confirmation email to ${email}`);
-    
+
     try {
       await this.emailService.sendBookingConfirmation(email, data);
       return { success: true, email };
@@ -99,7 +99,7 @@ export class EmailProcessor {
   async handleTicketsEmail(job: Job<TicketsEmailJob>) {
     const { email, data } = job.data;
     this.logger.log(`Sending tickets email to ${email}`);
-    
+
     try {
       await this.emailService.sendTicketEmail(email, data);
       return { success: true, email };
@@ -113,7 +113,7 @@ export class EmailProcessor {
   async handleCancellationEmail(job: Job<CancellationEmailJob>) {
     const { email, data } = job.data;
     this.logger.log(`Sending cancellation email to ${email}`);
-    
+
     try {
       await this.emailService.sendCancellationEmail(email, data);
       return { success: true, email };
@@ -127,7 +127,7 @@ export class EmailProcessor {
   async handleEventReminderEmail(job: Job<EventReminderEmailJob>) {
     const { email, data } = job.data;
     this.logger.log(`Sending event reminder email to ${email}`);
-    
+
     try {
       await this.emailService.sendEventReminder(email, data);
       return { success: true, email };

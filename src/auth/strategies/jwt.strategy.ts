@@ -32,7 +32,8 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     }
 
     // Remove password from user object
-    const { password, ...userWithoutPassword } = user;
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { password: _, ...userWithoutPassword } = user;
     return userWithoutPassword;
   }
 }

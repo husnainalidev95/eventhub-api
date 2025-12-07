@@ -27,10 +27,10 @@ export class ScheduledJobsService {
       const now = new Date();
       const tomorrow = new Date(now);
       tomorrow.setDate(tomorrow.getDate() + 1);
-      
+
       const startRange = new Date(tomorrow);
       startRange.setHours(0, 0, 0, 0);
-      
+
       const endRange = new Date(tomorrow);
       endRange.setHours(23, 59, 59, 999);
 
