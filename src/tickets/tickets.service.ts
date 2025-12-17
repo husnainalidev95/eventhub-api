@@ -2,10 +2,14 @@ import { Injectable, NotFoundException, BadRequestException } from '@nestjs/comm
 import { Prisma, TicketStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { TicketResponseDto } from './dto/ticket-response.dto';
+import { TicketsRepository } from '../bookings/tickets.repository';
 
 @Injectable()
 export class TicketsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private ticketsRepository: TicketsRepository,
+  ) {}
 
   async getUserTickets(
     userId: string,
@@ -26,44 +30,18 @@ export class TicketsService {
     }
 
     const [tickets, total] = await Promise.all([
-      this.prisma.ticket.findMany({
-        where,
-        include: {
-          event: {
-            select: {
-              id: true,
-              title: true,
-              date: true,
-              time: true,
-              venue: true,
-              city: true,
-              address: true,
-              image: true,
-            },
-          },
-          ticketType: {
-            select: {
-              id: true,
-              name: true,
-              price: true,
-              description: true,
-            },
-          },
-          booking: {
-            select: {
-              id: true,
-              bookingCode: true,
-              quantity: true,
-              totalAmount: true,
-              status: true,
-            },
-          },
-        },
-        orderBy: { createdAt: 'desc' },
+      this.ticketsRepository.findAll({
+        userId,
+        eventId,
+        status,
         skip,
         take: limit,
       }),
-      this.prisma.ticket.count({ where }),
+      this.ticketsRepository.count({
+        userId,
+        eventId,
+        status,
+      }),
     ]);
 
     return {
@@ -78,40 +56,7 @@ export class TicketsService {
   }
 
   async getTicketByCode(ticketCode: string, userId?: string): Promise<TicketResponseDto> {
-    const ticket = await this.prisma.ticket.findUnique({
-      where: { ticketCode },
-      include: {
-        event: {
-          select: {
-            id: true,
-            title: true,
-            date: true,
-            time: true,
-            venue: true,
-            city: true,
-            address: true,
-            image: true,
-          },
-        },
-        ticketType: {
-          select: {
-            id: true,
-            name: true,
-            price: true,
-            description: true,
-          },
-        },
-        booking: {
-          select: {
-            id: true,
-            bookingCode: true,
-            quantity: true,
-            totalAmount: true,
-            status: true,
-          },
-        },
-      },
-    });
+    const ticket = await this.ticketsRepository.findByTicketCode(ticketCode);
 
     if (!ticket) {
       throw new NotFoundException('Ticket not found');
@@ -127,13 +72,7 @@ export class TicketsService {
 
   async validateTicket(ticketCode: string): Promise<TicketResponseDto> {
     // Get ticket
-    const ticket = await this.prisma.ticket.findUnique({
-      where: { ticketCode },
-      include: {
-        event: true,
-        booking: true,
-      },
-    });
+    const ticket = await this.ticketsRepository.findByTicketCode(ticketCode);
 
     if (!ticket) {
       throw new NotFoundException('Ticket not found');
@@ -154,10 +93,7 @@ export class TicketsService {
     const now = new Date();
     if (eventDate < now) {
       // Update status to expired
-      await this.prisma.ticket.update({
-        where: { ticketCode },
-        data: { status: 'EXPIRED' },
-      });
+      await this.ticketsRepository.update(ticket.id, { status: 'EXPIRED' });
       throw new BadRequestException('Ticket has expired (event date passed)');
     }
 
@@ -167,44 +103,13 @@ export class TicketsService {
     }
 
     // Mark ticket as used
-    const updatedTicket = await this.prisma.ticket.update({
-      where: { ticketCode },
-      data: {
-        status: 'USED',
-        usedAt: new Date(),
-      },
-      include: {
-        event: {
-          select: {
-            id: true,
-            title: true,
-            date: true,
-            time: true,
-            venue: true,
-            city: true,
-            address: true,
-            image: true,
-          },
-        },
-        ticketType: {
-          select: {
-            id: true,
-            name: true,
-            price: true,
-            description: true,
-          },
-        },
-        booking: {
-          select: {
-            id: true,
-            bookingCode: true,
-            quantity: true,
-            totalAmount: true,
-            status: true,
-          },
-        },
-      },
+    await this.ticketsRepository.update(ticket.id, {
+      status: 'USED',
+      usedAt: new Date(),
     });
+
+    // Return updated ticket
+    const updatedTicket = await this.ticketsRepository.findByTicketCode(ticketCode);
 
     return updatedTicket;
   }

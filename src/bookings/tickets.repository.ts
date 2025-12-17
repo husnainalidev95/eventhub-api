@@ -50,13 +50,16 @@ export class TicketsRepository extends BaseRepository<Ticket> {
   }
 
   /**
-   * Find all tickets with filters
+   * Find all tickets with filters and pagination
    */
   async findAll(
     filter?: {
       bookingId?: string;
       userId?: string;
       eventId?: string;
+      status?: string;
+      skip?: number;
+      take?: number;
     },
     context?: WithPrisma,
   ) {
@@ -74,8 +77,14 @@ export class TicketsRepository extends BaseRepository<Ticket> {
       where.eventId = filter.eventId;
     }
 
+    if (filter?.status) {
+      where.status = filter.status as any;
+    }
+
     return this.getPrismaClient(context).ticket.findMany({
       where,
+      skip: filter?.skip,
+      take: filter?.take,
       include: {
         event: {
           select: {
@@ -85,6 +94,8 @@ export class TicketsRepository extends BaseRepository<Ticket> {
             time: true,
             venue: true,
             city: true,
+            address: true,
+            image: true,
           },
         },
         ticketType: {
@@ -92,10 +103,54 @@ export class TicketsRepository extends BaseRepository<Ticket> {
             id: true,
             name: true,
             price: true,
+            description: true,
+          },
+        },
+        booking: {
+          select: {
+            id: true,
+            bookingCode: true,
+            quantity: true,
+            totalAmount: true,
+            status: true,
           },
         },
       },
+      orderBy: { createdAt: 'desc' },
     });
+  }
+
+  /**
+   * Count tickets with filters
+   */
+  async count(
+    filter?: {
+      bookingId?: string;
+      userId?: string;
+      eventId?: string;
+      status?: string;
+    },
+    context?: WithPrisma,
+  ): Promise<number> {
+    const where: Prisma.TicketWhereInput = {};
+
+    if (filter?.bookingId) {
+      where.bookingId = filter.bookingId;
+    }
+
+    if (filter?.userId) {
+      where.userId = filter.userId;
+    }
+
+    if (filter?.eventId) {
+      where.eventId = filter.eventId;
+    }
+
+    if (filter?.status) {
+      where.status = filter.status as any;
+    }
+
+    return this.getPrismaClient(context).ticket.count({ where });
   }
 
   /**
@@ -155,7 +210,7 @@ export class TicketsRepository extends BaseRepository<Ticket> {
   /**
    * Find ticket by ticket code
    */
-  async findByTicketCode(ticketCode: string, context?: WithPrisma): Promise<Ticket | null> {
+  async findByTicketCode(ticketCode: string, context?: WithPrisma) {
     return this.getPrismaClient(context).ticket.findUnique({
       where: { ticketCode },
       include: {
@@ -167,6 +222,8 @@ export class TicketsRepository extends BaseRepository<Ticket> {
             time: true,
             venue: true,
             city: true,
+            address: true,
+            image: true,
           },
         },
         ticketType: {
@@ -174,12 +231,16 @@ export class TicketsRepository extends BaseRepository<Ticket> {
             id: true,
             name: true,
             price: true,
+            description: true,
           },
         },
         booking: {
           select: {
             id: true,
             bookingCode: true,
+            quantity: true,
+            totalAmount: true,
+            status: true,
           },
         },
       },
