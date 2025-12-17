@@ -4,6 +4,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { EventsController } from './events.controller';
 import { EventsService } from './events.service';
 import { EventsGateway } from './events.gateway';
+import { EventsRepository } from './events.repository';
 import { PrismaModule } from '../prisma/prisma.module';
 import { UploadModule } from '../upload/upload.module';
 
@@ -21,7 +22,7 @@ import { UploadModule } from '../upload/upload.module';
     }),
   ],
   controllers: [EventsController],
-  providers: [EventsService, EventsGateway],
+  providers: [EventsService, EventsRepository, EventsGateway],
   exports: [EventsService, EventsGateway],
 })
 export class EventsModule {}
