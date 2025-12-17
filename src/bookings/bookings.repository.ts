@@ -1,7 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { Booking, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
-import { BaseRepository, WithPrisma } from '../common/repositories/base.repository';
+import { BaseRepository } from '../common/repositories/base.repository';
+import { WithPrisma } from '../common/interfaces/base.repository.interface';
 
 /**
  * Bookings Repository

@@ -7,7 +7,9 @@
  * All methods support optional transaction context for atomic operations.
  */
 
-import { WithPrisma } from '../repositories/base.repository';
+export type WithPrisma<T = any> = {
+  trxPrisma?: T;
+};
 
 export interface IBaseRepository<T> {
   /**

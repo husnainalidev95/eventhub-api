@@ -1,14 +1,5 @@
-import { IBaseRepository } from '../interfaces/base.repository.interface';
+import { IBaseRepository, WithPrisma } from '../interfaces/base.repository.interface';
 import { PrismaService } from '../../prisma/prisma.service';
-
-/**
- * Transaction Context
- * Allows passing transaction-aware Prisma client to repositories
- */
-export interface WithPrisma<T = unknown> {
-  trxPrisma?: PrismaService;
-  context?: T;
-}
 
 /**
  * Abstract Base Repository
@@ -26,8 +17,8 @@ export abstract class BaseRepository<T> implements IBaseRepository<T> {
    * Get the Prisma client to use (transaction-aware)
    * If a transaction context is provided, use that, otherwise use the default client
    */
-  protected getPrismaClient(context?: WithPrisma): PrismaService {
-    return context?.trxPrisma ?? this.prisma;
+  protected getPrismaClient(context?: WithPrisma<PrismaService>): PrismaService {
+    return (context?.trxPrisma as PrismaService) ?? this.prisma;
   }
 
   abstract findById(id: string, context?: WithPrisma): Promise<T | null>;
