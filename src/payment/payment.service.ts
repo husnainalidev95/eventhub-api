@@ -9,8 +9,11 @@ import {
 import { ConfigService } from '@nestjs/config';
 import Stripe from 'stripe';
 import { RedisService } from '../redis/redis.service';
-import { PrismaService } from '../prisma/prisma.service';
 import { EventsGateway } from '../events/events.gateway';
+import { TicketTypesRepository } from '../bookings/ticket-types.repository';
+import { BookingsRepository } from '../bookings/bookings.repository';
+import { TicketsRepository } from '../bookings/tickets.repository';
+import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
 export class PaymentService {
@@ -21,6 +24,9 @@ export class PaymentService {
   constructor(
     private readonly configService: ConfigService,
     private readonly redisService: RedisService,
+    private readonly ticketTypesRepository: TicketTypesRepository,
+    private readonly bookingsRepository: BookingsRepository,
+    private readonly ticketsRepository: TicketsRepository,
     private readonly prisma: PrismaService,
     @Inject(forwardRef(() => EventsGateway))
     private readonly eventsGateway: EventsGateway,
@@ -55,10 +61,7 @@ export class PaymentService {
     }
 
     // Get ticket type to calculate amount
-    const ticketType = await this.prisma.ticketType.findUnique({
-      where: { id: holdData.ticketTypeId },
-      include: { event: true },
-    });
+    const ticketType = await this.ticketTypesRepository.findById(holdData.ticketTypeId);
 
     if (!ticketType) {
       throw new BadRequestException('Ticket type not found');
@@ -145,9 +148,7 @@ export class PaymentService {
       }
 
       // Get ticket type
-      const ticketType = await this.prisma.ticketType.findUnique({
-        where: { id: ticketTypeId },
-      });
+      const ticketType = await this.ticketTypesRepository.findById(ticketTypeId);
 
       if (!ticketType || ticketType.available < parseInt(quantity)) {
         this.logger.error(`Insufficient tickets available for hold ${holdId}`);
@@ -157,12 +158,14 @@ export class PaymentService {
 
       // Create booking in transaction
       const booking = await this.prisma.$transaction(async (tx) => {
+        const context = { trxPrisma: tx };
+
         // Generate unique booking code
         const bookingCode = `BK-${Date.now()}-${Math.random().toString(36).substring(2, 9).toUpperCase()}`;
 
         // Create booking
-        const newBooking = await tx.booking.create({
-          data: {
+        const newBooking = await this.bookingsRepository.create(
+          {
             userId,
             eventId: ticketType.eventId,
             ticketTypeId,
@@ -174,17 +177,15 @@ export class PaymentService {
             paymentStatus: 'PAID',
             status: 'CONFIRMED',
           },
-        });
+          context,
+        );
 
         // Decrement available tickets
-        await tx.ticketType.update({
-          where: { id: ticketTypeId },
-          data: {
-            available: {
-              decrement: parseInt(quantity),
-            },
-          },
-        });
+        await this.ticketTypesRepository.decrementAvailable(
+          ticketTypeId,
+          parseInt(quantity),
+          context,
+        );
 
         // Generate tickets
         const tickets = [];
@@ -209,7 +210,7 @@ export class PaymentService {
           });
         }
 
-        await tx.ticket.createMany({ data: tickets });
+        await this.ticketsRepository.createMany(tickets, context);
 
         return newBooking;
       });
@@ -224,9 +225,7 @@ export class PaymentService {
       // Emit real-time updates
       this.eventsGateway.emitBookingCreated(userId, booking);
 
-      const updatedTicketType = await this.prisma.ticketType.findUnique({
-        where: { id: ticketTypeId },
-      });
+      const updatedTicketType = await this.ticketTypesRepository.findById(ticketTypeId);
       this.eventsGateway.emitTicketAvailabilityUpdate(
         ticketType.eventId,
         ticketTypeId,
