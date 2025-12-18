@@ -68,4 +68,12 @@ export class GetEventsQueryDto {
   @IsOptional()
   @Type(() => Boolean)
   featured?: boolean;
+
+  @ApiProperty({
+    required: false,
+    description: 'Filter by organizer ID',
+  })
+  @IsOptional()
+  @IsString()
+  organizerId?: string;
 }

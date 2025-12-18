@@ -46,6 +46,7 @@ export class EventsRepository extends BaseRepository<Event> {
       status?: string;
       featured?: boolean;
       search?: string;
+      organizerId?: string;
       skip?: number;
       take?: number;
     },
@@ -67,6 +68,10 @@ export class EventsRepository extends BaseRepository<Event> {
 
     if (filter?.featured !== undefined) {
       where.featured = filter.featured;
+    }
+
+    if (filter?.organizerId) {
+      where.organizerId = filter.organizerId;
     }
 
     if (filter?.search) {
@@ -107,6 +112,7 @@ export class EventsRepository extends BaseRepository<Event> {
       status?: string;
       featured?: boolean;
       search?: string;
+      organizerId?: string;
     },
     context?: WithPrisma,
   ): Promise<number> {
@@ -126,6 +132,10 @@ export class EventsRepository extends BaseRepository<Event> {
 
     if (filter?.featured !== undefined) {
       where.featured = filter.featured;
+    }
+
+    if (filter?.organizerId) {
+      where.organizerId = filter.organizerId;
     }
 
     if (filter?.search) {

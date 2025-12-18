@@ -39,7 +39,7 @@ export class EventsService {
   }
 
   async findAll(query: GetEventsQueryDto) {
-    const { page = 1, limit = 10, category, city, search, status, featured } = query;
+    const { page = 1, limit = 10, category, city, search, status, featured, organizerId } = query;
     const skip = (page - 1) * limit;
 
     // Get events and total count
@@ -50,6 +50,7 @@ export class EventsService {
         search,
         status,
         featured,
+        organizerId,
         skip,
         take: limit,
       }),
@@ -59,6 +60,7 @@ export class EventsService {
         search,
         status,
         featured,
+        organizerId,
       }),
     ]);
 

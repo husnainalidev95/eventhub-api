@@ -489,11 +489,12 @@ enum PaymentStatus {
 
 ### Events
 - `GET /api/events` - List all active events (public)
+  - Query params: `?organizerId={id}` - Filter by organizer (get organizer's events)
+  - Query params: `?city={city}&status={status}&search={keyword}` - Other filters
 - `GET /api/events/:id` - Get event details (public)
 - `POST /api/events` - Create event (organizer only)
 - `PATCH /api/events/:id` - Update event (organizer only)
 - `DELETE /api/events/:id` - Delete event (organizer only)
-- `GET /api/events/organizer/my-events` - Get organizer's events
 
 ### Bookings & Holds
 - `POST /api/bookings/hold` - Create seat hold (10 min)
