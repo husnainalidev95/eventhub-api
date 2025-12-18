@@ -114,6 +114,55 @@ npm run start:dev
 - **Cloudinary** - Image storage & optimization
 - **Resend** - Transactional emails
 
+### 🎯 Repository Pattern Architecture
+
+**EventHub uses the Repository Pattern for clean data access layer separation.**
+
+#### Why Repository Pattern?
+- **ORM Independence** - Easy migration from Prisma to other ORMs (Drizzle, TypeORM, etc.)
+- **Better Testability** - Mock repositories for unit tests without database dependencies
+- **Single Responsibility** - Services handle business logic, repositories handle data access
+- **Transaction Support** - Built-in transaction context for multi-step operations
+- **Code Reusability** - Common queries centralized in repositories
+
+#### 10 Repositories Created
+1. **BookingsRepository** - Booking CRUD, holds management, status updates
+2. **TicketTypesRepository** - Ticket type management, availability tracking
+3. **TicketsRepository** - Ticket CRUD, validation, status filters
+4. **EventsRepository** - Event CRUD with search/filter capabilities
+5. **UsersRepository** - User management and authentication queries
+
+Each repository:
+- Extends `BaseRepository` with standard CRUD operations
+- Implements `IBaseRepository` interface
+- Supports transaction context via `WithPrisma<T>` type
+- Provides module-specific query methods
+
+#### Transaction Support
+```typescript
+// Example: Payment flow with transaction
+async handlePaymentSuccess(context: WithPrisma) {
+  const ticketType = await this.ticketTypesRepo.findById(id, context);
+  const booking = await this.bookingsRepo.create(data, context);
+  const tickets = await this.ticketsRepo.createMany(tickets, context);
+  return { booking, tickets };
+}
+```
+
+#### Testing Results
+✅ **14 comprehensive tests passed**:
+- Authentication (login, register, JWT validation)
+- Events (CRUD, search, filters, pagination)
+- Bookings (hold creation, booking flow, pagination)
+- Tickets (filters, get by code, validation)
+- Payment (Stripe intent creation, amount calculation)
+
+**All core functionality verified with repository pattern!**
+
+---
+
+_For detailed repository implementation, see [PROJECT_DOCUMENTATION.md](PROJECT_DOCUMENTATION.md)_
+
 ### Key Features
 
 #### 1. Authentication & Authorization
