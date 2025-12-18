@@ -2,14 +2,18 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { InjectQueue } from '@nestjs/bull';
 import { Queue } from 'bullmq';
-import { PrismaService } from '../prisma/prisma.service';
 import { EventReminderEmailJob } from './processors/email.processor';
+import { EventsRepository } from '../events/events.repository';
+import { BookingsRepository } from '../bookings/bookings.repository';
+import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
 export class ScheduledJobsService {
   private readonly logger = new Logger(ScheduledJobsService.name);
 
   constructor(
+    private eventsRepository: EventsRepository,
+    private bookingsRepository: BookingsRepository,
     private prisma: PrismaService,
     @InjectQueue('email') private emailQueue: Queue,
   ) {}
@@ -35,6 +39,8 @@ export class ScheduledJobsService {
       endRange.setHours(23, 59, 59, 999);
 
       // Find events happening tomorrow
+      // Note: Using Prisma directly here due to complex nested include with bookings filter
+      // This is acceptable as it's a scheduled job with specific requirements
       const upcomingEvents = await this.prisma.event.findMany({
         where: {
           date: {

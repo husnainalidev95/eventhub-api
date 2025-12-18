@@ -24,6 +24,8 @@ import {
 import { BookingsRepository } from './bookings.repository';
 import { TicketTypesRepository } from './ticket-types.repository';
 import { TicketsRepository } from './tickets.repository';
+import { EventsRepository } from '../events/events.repository';
+import { UsersRepository } from '../auth/users.repository';
 
 @Injectable()
 export class BookingsService {
@@ -32,6 +34,8 @@ export class BookingsService {
     private bookingsRepository: BookingsRepository,
     private ticketTypesRepository: TicketTypesRepository,
     private ticketsRepository: TicketsRepository,
+    private eventsRepository: EventsRepository,
+    private usersRepository: UsersRepository,
     private redis: RedisService,
     private emailService: EmailService,
     private paymentService: PaymentService,
@@ -44,9 +48,7 @@ export class BookingsService {
     const { eventId, ticketTypeId, quantity } = createHoldDto;
 
     // 1. Verify event exists and is active
-    const event = await this.prisma.event.findUnique({
-      where: { id: eventId },
-    });
+    const event = await this.eventsRepository.findById(eventId);
 
     if (!event) {
       throw new NotFoundException('Event not found');
@@ -227,13 +229,8 @@ export class BookingsService {
 
     // 9. Send booking confirmation and tickets email (via queue)
     try {
-      const user = await this.prisma.user.findUnique({
-        where: { id: userId },
-      });
-
-      const event = await this.prisma.event.findUnique({
-        where: { id: completeBooking.eventId },
-      });
+      const user = await this.usersRepository.findById(userId);
+      const event = await this.eventsRepository.findById(completeBooking.eventId);
 
       const tickets = await this.ticketsRepository.findAll({
         bookingId: completeBooking.id,
@@ -395,13 +392,8 @@ export class BookingsService {
 
     // 7. Send cancellation email (via queue)
     try {
-      const user = await this.prisma.user.findUnique({
-        where: { id: userId },
-      });
-
-      const event = await this.prisma.event.findUnique({
-        where: { id: booking.eventId },
-      });
+      const user = await this.usersRepository.findById(userId);
+      const event = await this.eventsRepository.findById(booking.eventId);
 
       await this.emailQueue.add('cancellation', {
         email: user.email,

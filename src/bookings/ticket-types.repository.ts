@@ -26,6 +26,16 @@ export class TicketTypesRepository extends BaseRepository<TicketType> {
   }
 
   /**
+   * Find ticket type by ID with event relation
+   */
+  async findByIdWithEvent(id: string, context?: WithPrisma) {
+    return this.getPrismaClient(context).ticketType.findUnique({
+      where: { id },
+      include: { event: true },
+    });
+  }
+
+  /**
    * Find all ticket types for an event
    */
   async findAll(

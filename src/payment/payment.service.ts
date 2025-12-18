@@ -61,7 +61,7 @@ export class PaymentService {
     }
 
     // Get ticket type to calculate amount
-    const ticketType = await this.ticketTypesRepository.findById(holdData.ticketTypeId);
+    const ticketType = await this.ticketTypesRepository.findByIdWithEvent(holdData.ticketTypeId);
 
     if (!ticketType) {
       throw new BadRequestException('Ticket type not found');
@@ -166,9 +166,9 @@ export class PaymentService {
         // Create booking
         const newBooking = await this.bookingsRepository.create(
           {
-            userId,
-            eventId: ticketType.eventId,
-            ticketTypeId,
+            user: { connect: { id: userId } },
+            event: { connect: { id: ticketType.eventId } },
+            ticketType: { connect: { id: ticketTypeId } },
             quantity: parseInt(quantity),
             totalAmount: paymentIntent.amount / 100, // Convert cents to dollars
             bookingCode,

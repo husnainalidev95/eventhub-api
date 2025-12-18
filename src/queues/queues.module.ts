@@ -5,6 +5,9 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { EmailProcessor } from './processors/email.processor';
 import { ScheduledJobsService } from './scheduled-jobs.service';
 import { EmailModule } from '../email/email.module';
+import { EventsRepository } from '../events/events.repository';
+import { BookingsRepository } from '../bookings/bookings.repository';
+import { PrismaModule } from '../prisma/prisma.module';
 
 @Module({
   imports: [
@@ -33,8 +36,9 @@ import { EmailModule } from '../email/email.module';
       },
     }),
     EmailModule,
+    PrismaModule,
   ],
-  providers: [EmailProcessor, ScheduledJobsService],
+  providers: [EmailProcessor, ScheduledJobsService, EventsRepository, BookingsRepository],
   exports: [BullModule],
 })
 export class QueuesModule {}
