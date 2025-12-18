@@ -485,7 +485,7 @@ enum PaymentStatus {
 ### Authentication
 - `POST /api/auth/register` - Register new user
 - `POST /api/auth/login` - Login with credentials
-- `GET /api/auth/profile` - Get current user profile (protected)
+- `GET /api/auth/me` - Get current user profile (protected)
 
 ### Events
 - `GET /api/events` - List all active events (public)
@@ -508,14 +508,14 @@ enum PaymentStatus {
 ### Tickets
 - `GET /api/tickets` - Get user's tickets
 - `GET /api/tickets/:id` - Get ticket details
-- `POST /api/tickets/:id/validate` - Validate ticket (organizer)
+- `POST /api/tickets/:ticketCode/validate` - Validate ticket by code (organizer)
 
 ### Payment
 - `POST /api/payment/create-intent` - Create Stripe payment intent
 - `POST /api/payment/webhook` - Stripe webhook (automated)
 
 ### Upload
-- `POST /api/upload` - Upload image to Cloudinary
+- `POST /api/upload/event-image` - Upload event image to Cloudinary
 
 ### WebSocket Events
 - `ticket:availability` - Real-time ticket availability
