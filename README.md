@@ -14,6 +14,10 @@ EventHub API is a robust backend service that powers event discovery, ticket boo
 - **Background Jobs** - Asynchronous email processing and scheduled tasks with BullMQ
 - **QR Code Tickets** - Digital tickets with unique QR codes for validation
 - **Role-Based Access** - Multi-level authentication (User, Organizer, Admin)
+- **User Profile Management** - Update profile, change password, and manage account settings
+- **Ticket Type Management** - Organizers can create, update, and manage ticket types for their events
+- **Admin Dashboard** - Comprehensive admin panel for user management, event oversight, and platform statistics
+- **Dynamic Categories & Cities** - Automatically extracted from events for easy filtering
 - **Image Management** - Cloudinary integration for event images
 - **API Documentation** - Interactive Swagger/OpenAPI documentation
 
@@ -236,13 +240,23 @@ auth/                      # Authentication module
   ├── auth.controller.ts   # Register, login, profile endpoints
   ├── auth.service.ts      # Auth logic with JWT
   ├── jwt.strategy.ts      # JWT validation strategy
-  └── guards/              # Auth guards
+  ├── guards/              # Auth guards
+  └── dto/                 # Auth DTOs (register, login, update profile, change password)
 
 events/                    # Events module
-  ├── events.controller.ts # CRUD endpoints
+  ├── events.controller.ts # CRUD endpoints + ticket type management
   ├── events.service.ts    # Business logic
   ├── events.gateway.ts    # WebSocket gateway
   └── dto/                 # Data transfer objects
+
+admin/                     # Admin dashboard module
+  ├── admin.controller.ts  # Admin endpoints (users, events, statistics)
+  ├── admin.service.ts     # Admin business logic
+  └── dto/                 # Admin DTOs
+
+common/                    # Common utilities module
+  ├── common.controller.ts # Categories and cities endpoints
+  └── repositories/        # Base repository pattern
 
 bookings/                  # Bookings module
   ├── bookings.controller.ts # Booking endpoints
@@ -486,6 +500,8 @@ enum PaymentStatus {
 - `POST /api/auth/register` - Register new user
 - `POST /api/auth/login` - Login with credentials
 - `GET /api/auth/me` - Get current user profile (protected)
+- `PATCH /api/auth/profile` - Update user profile (name, phone, avatar)
+- `PATCH /api/auth/password` - Change user password
 
 ### Events
 - `GET /api/events` - List all active events (public)
@@ -497,6 +513,12 @@ enum PaymentStatus {
 - `POST /api/events` - Create event (organizer only)
 - `PATCH /api/events/:id` - Update event (organizer only)
 - `DELETE /api/events/:id` - Delete event (organizer only)
+
+### Ticket Types (Organizer)
+- `POST /api/events/:eventId/ticket-types` - Create ticket type for event
+- `GET /api/events/:eventId/ticket-types` - Get all ticket types for event
+- `PATCH /api/events/:eventId/ticket-types/:id` - Update ticket type
+- `DELETE /api/events/:eventId/ticket-types/:id` - Delete ticket type
 
 ### Bookings & Holds
 - `POST /api/bookings/hold` - Create seat hold (10 min)
@@ -516,8 +538,22 @@ enum PaymentStatus {
 - `POST /api/payment/create-intent` - Create Stripe payment intent
 - `POST /api/payment/webhook` - Stripe webhook (automated)
 
+### Common
+- `GET /api/categories` - Get all event categories with counts
+- `GET /api/cities` - Get all cities with event counts
+
 ### Upload
 - `POST /api/upload/event-image` - Upload event image to Cloudinary
+
+### Admin (Admin Only)
+- `GET /api/admin/users` - Get all users with pagination and filters
+- `GET /api/admin/users/:id` - Get user details with related data
+- `POST /api/admin/users/create-organizer` - Create organizer account
+- `PATCH /api/admin/users/:id/role` - Update user role
+- `PATCH /api/admin/users/:id/status` - Activate/deactivate user
+- `DELETE /api/admin/users/:id` - Delete user
+- `GET /api/admin/events` - Get all events (admin view with statistics)
+- `GET /api/admin/statistics` - Get platform statistics
 
 ### WebSocket Events
 - `ticket:availability` - Real-time ticket availability
@@ -756,23 +792,23 @@ curl http://localhost:3001/api
 
 | Phase | Feature | Status | Date |
 |-------|---------|--------|------|
-| Phase 1 | Project Setup & Database | ✅ Complete | Nov 3, 2025 |
-| Phase 2 | Authentication (Register/Login) | ✅ Complete | Nov 22, 2025 |
-| Phase 3 | Events CRUD (Read) | ✅ Complete | Nov 22, 2025 |
-| Phase 4 | Events CRUD (Update/Delete) | ✅ Complete | Nov 22, 2025 |
-| Phase 5 | Redis + Seat Holds | ✅ Complete | Nov 22, 2025 |
-| Phase 6 | Booking System | ✅ Complete | Nov 22, 2025 |
-| Phase 7 | Ticket Management | ✅ Complete | Nov 22, 2025 |
-| Phase 8 | Email Notifications | ✅ Complete | Nov 22, 2025 |
-| Phase 9 | File Upload (Cloudinary) | ✅ Complete | Nov 22, 2025 |
-| Phase 10 | Stripe Payment Integration | ✅ Complete | Dec 6, 2025 |
-| Phase 11 | Real-time Features (Socket.io) | ✅ Complete | Dec 6, 2025 |
-| Phase 12 | Background Jobs (BullMQ) | ✅ Complete | Dec 6, 2025 |
-| Phase 13 | Admin Dashboard & Analytics | 📝 Future |
-| Phase 14 | Deployment to Railway | 📝 Future |
+| Core Setup | Project Setup & Database | ✅ Complete | Nov 3, 2025 |
+| Core Setup | Authentication (Register/Login) | ✅ Complete | Nov 22, 2025 |
+| Core Setup | Events CRUD | ✅ Complete | Nov 22, 2025 |
+| Core Setup | Redis + Seat Holds | ✅ Complete | Nov 22, 2025 |
+| Core Setup | Booking System | ✅ Complete | Nov 22, 2025 |
+| Core Setup | Ticket Management | ✅ Complete | Nov 22, 2025 |
+| Core Setup | Email Notifications | ✅ Complete | Nov 22, 2025 |
+| Core Setup | File Upload (Cloudinary) | ✅ Complete | Nov 22, 2025 |
+| Core Setup | Stripe Payment Integration | ✅ Complete | Dec 6, 2025 |
+| Core Setup | Real-time Features (Socket.io) | ✅ Complete | Dec 6, 2025 |
+| Core Setup | Background Jobs (BullMQ) | ✅ Complete | Dec 6, 2025 |
+| **Phase 1** | **User Profile & Common Features** | ✅ **Complete** | **Dec 28, 2025** |
+| **Phase 2** | **Ticket Type Management** | ✅ **Complete** | **Dec 28, 2025** |
+| **Phase 3** | **Admin Dashboard** | ✅ **Complete** | **Dec 28, 2025** |
 
-**Current Status: Phase 12 Complete ✅**  
-**All Core Features Implemented!** 🎉
+**Current Status: Phase 3 Complete ✅**  
+**17/40 API endpoints implemented (42.5%)** 🎉
 
 ---
 
@@ -794,12 +830,13 @@ curl http://localhost:3001/api
 ## 🚀 Next Steps
 
 ### For Development
-- Add more event categories
-- Implement event search and filters
-- Add user profile management
-- Create admin dashboard
-- Add event analytics
-- Implement notifications system
+- Email verification system
+- Password reset functionality
+- Organizer analytics dashboard
+- Event reviews and ratings
+- Favorites/Wishlist feature
+- Advanced search filters
+- Event recommendations
 
 ### For Production
 - Set up CI/CD pipeline
@@ -853,7 +890,7 @@ Your EventHub backend is:
 - ✅ Running background jobs
 - ✅ Ready for frontend integration
 
-**All 12 phases complete!** 🚀
+**Core features complete + Phase 1, 2, and 3 implemented!** 🚀
 
 ---
 
