@@ -6,6 +6,8 @@ import {
   ticketEmailTemplate,
   cancellationTemplate,
   eventReminderTemplate,
+  emailVerificationTemplate,
+  passwordResetTemplate,
 } from './templates';
 
 @Injectable()
@@ -177,6 +179,72 @@ export class EmailService {
       return data;
     } catch (error) {
       this.logger.error('Error sending event reminder email', error);
+      throw error;
+    }
+  }
+
+  async sendEmailVerification(
+    to: string,
+    verificationData: {
+      userName: string;
+      verificationLink: string;
+    },
+  ) {
+    if (!this.resend) {
+      this.logger.warn('Email service not configured. Skipping verification email.');
+      return null;
+    }
+
+    try {
+      const { data, error } = await this.resend.emails.send({
+        from: 'EventHub <onboarding@resend.dev>',
+        to,
+        subject: 'Verify Your Email Address - EventHub',
+        html: emailVerificationTemplate(verificationData),
+      });
+
+      if (error) {
+        this.logger.error('Failed to send verification email', error);
+        throw error;
+      }
+
+      this.logger.log(`Verification email sent to ${to}`);
+      return data;
+    } catch (error) {
+      this.logger.error('Error sending verification email', error);
+      throw error;
+    }
+  }
+
+  async sendPasswordReset(
+    to: string,
+    resetData: {
+      userName: string;
+      resetLink: string;
+    },
+  ) {
+    if (!this.resend) {
+      this.logger.warn('Email service not configured. Skipping password reset email.');
+      return null;
+    }
+
+    try {
+      const { data, error } = await this.resend.emails.send({
+        from: 'EventHub <onboarding@resend.dev>',
+        to,
+        subject: 'Reset Your Password - EventHub',
+        html: passwordResetTemplate(resetData),
+      });
+
+      if (error) {
+        this.logger.error('Failed to send password reset email', error);
+        throw error;
+      }
+
+      this.logger.log(`Password reset email sent to ${to}`);
+      return data;
+    } catch (error) {
+      this.logger.error('Error sending password reset email', error);
       throw error;
     }
   }

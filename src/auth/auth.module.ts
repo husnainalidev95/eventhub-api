@@ -7,10 +7,12 @@ import { AuthService } from './auth.service';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { UsersRepository } from './users.repository';
 import { PrismaModule } from '../prisma/prisma.module';
+import { QueuesModule } from '../queues/queues.module';
 
 @Module({
   imports: [
     PrismaModule,
+    QueuesModule,
     PassportModule,
     JwtModule.registerAsync({
       inject: [ConfigService],

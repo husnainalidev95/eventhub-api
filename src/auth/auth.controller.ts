@@ -1,7 +1,16 @@
 import { Controller, Post, Body, Get, Patch, UseGuards, Request } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
-import { RegisterDto, LoginDto, AuthResponseDto, UpdateProfileDto, ChangePasswordDto } from './dto';
+import {
+  RegisterDto,
+  LoginDto,
+  AuthResponseDto,
+  UpdateProfileDto,
+  ChangePasswordDto,
+  VerifyEmailDto,
+  ForgotPasswordDto,
+  ResetPasswordDto,
+} from './dto';
 import { JwtAuthGuard } from './guards';
 import { CurrentUser } from './decorators';
 
@@ -69,6 +78,43 @@ export class AuthController {
     @Body() changePasswordDto: ChangePasswordDto,
   ) {
     return this.authService.changePassword(user.id, changePasswordDto);
+  }
+
+  @Post('send-verification')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Send email verification link' })
+  @ApiResponse({ status: 200, description: 'Verification email sent successfully' })
+  @ApiResponse({ status: 400, description: 'Bad Request - Email already verified' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  async sendVerificationEmail(@CurrentUser() user: { id: string }): Promise<{ message: string }> {
+    return this.authService.sendVerificationEmail(user.id);
+  }
+
+  @Post('verify-email')
+  @ApiOperation({ summary: 'Verify email address with token' })
+  @ApiResponse({ status: 200, description: 'Email verified successfully' })
+  @ApiResponse({ status: 400, description: 'Bad Request - Invalid or expired token, or email already verified' })
+  async verifyEmail(@Body() verifyEmailDto: VerifyEmailDto): Promise<{ message: string }> {
+    return this.authService.verifyEmail(verifyEmailDto);
+  }
+
+  @Post('forgot-password')
+  @ApiOperation({ summary: 'Request password reset email' })
+  @ApiResponse({
+    status: 200,
+    description: 'If an account exists with this email, a password reset link has been sent',
+  })
+  async forgotPassword(@Body() forgotPasswordDto: ForgotPasswordDto): Promise<{ message: string }> {
+    return this.authService.forgotPassword(forgotPasswordDto);
+  }
+
+  @Post('reset-password')
+  @ApiOperation({ summary: 'Reset password with token' })
+  @ApiResponse({ status: 200, description: 'Password reset successfully' })
+  @ApiResponse({ status: 400, description: 'Bad Request - Invalid or expired token, or weak password' })
+  async resetPassword(@Body() resetPasswordDto: ResetPasswordDto): Promise<{ message: string }> {
+    return this.authService.resetPassword(resetPasswordDto);
   }
 
   @Get('test-protected')

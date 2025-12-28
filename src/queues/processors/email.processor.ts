@@ -60,6 +60,22 @@ export interface EventReminderEmailJob {
   };
 }
 
+export interface EmailVerificationJob {
+  email: string;
+  data: {
+    userName: string;
+    verificationLink: string;
+  };
+}
+
+export interface PasswordResetJob {
+  email: string;
+  data: {
+    userName: string;
+    resetLink: string;
+  };
+}
+
 @Processor('email')
 export class EmailProcessor {
   private readonly logger = new Logger(EmailProcessor.name);
@@ -133,6 +149,34 @@ export class EmailProcessor {
       return { success: true, email };
     } catch (error) {
       this.logger.error(`Failed to send event reminder email: ${error.message}`);
+      throw error;
+    }
+  }
+
+  @Process('email-verification')
+  async handleEmailVerification(job: Job<EmailVerificationJob>) {
+    const { email, data } = job.data;
+    this.logger.log(`Sending email verification to ${email}`);
+
+    try {
+      await this.emailService.sendEmailVerification(email, data);
+      return { success: true, email };
+    } catch (error) {
+      this.logger.error(`Failed to send verification email: ${error.message}`);
+      throw error;
+    }
+  }
+
+  @Process('password-reset')
+  async handlePasswordReset(job: Job<PasswordResetJob>) {
+    const { email, data } = job.data;
+    this.logger.log(`Sending password reset email to ${email}`);
+
+    try {
+      await this.emailService.sendPasswordReset(email, data);
+      return { success: true, email };
+    } catch (error) {
+      this.logger.error(`Failed to send password reset email: ${error.message}`);
       throw error;
     }
   }
