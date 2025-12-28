@@ -1,6 +1,11 @@
-import { Injectable, ConflictException, UnauthorizedException } from '@nestjs/common';
+import {
+  Injectable,
+  ConflictException,
+  UnauthorizedException,
+  BadRequestException,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { RegisterDto, LoginDto, AuthResponseDto } from './dto';
+import { RegisterDto, LoginDto, AuthResponseDto, UpdateProfileDto, ChangePasswordDto } from './dto';
 import { hashPassword, comparePasswords } from './utils/password.util';
 import { UsersRepository } from './users.repository';
 
@@ -77,6 +82,73 @@ export class AuthService {
     return {
       user: userWithoutPassword,
       accessToken,
+    };
+  }
+
+  async getProfile(userId: string) {
+    const user = await this.usersRepository.findById(userId);
+
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    // Remove password from response
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { password: _, ...userWithoutPassword } = user;
+
+    return userWithoutPassword;
+  }
+
+  async updateProfile(userId: string, updateProfileDto: UpdateProfileDto) {
+    const user = await this.usersRepository.findById(userId);
+
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    const updatedUser = await this.usersRepository.update(userId, {
+      ...updateProfileDto,
+    });
+
+    // Remove password from response
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { password: _, ...userWithoutPassword } = updatedUser;
+
+    return userWithoutPassword;
+  }
+
+  async changePassword(userId: string, changePasswordDto: ChangePasswordDto) {
+    const { currentPassword, newPassword } = changePasswordDto;
+
+    // Get user with password
+    const user = await this.usersRepository.findById(userId);
+
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    // Verify current password
+    const isPasswordValid = await comparePasswords(currentPassword, user.password);
+
+    if (!isPasswordValid) {
+      throw new UnauthorizedException('Current password is incorrect');
+    }
+
+    // Check if new password is different
+    if (currentPassword === newPassword) {
+      throw new BadRequestException('New password must be different from current password');
+    }
+
+    // Hash new password
+    const hashedPassword = await hashPassword(newPassword);
+
+    // Update password
+    await this.usersRepository.update(userId, {
+      password: hashedPassword,
+    });
+
+    return {
+      message: 'Password changed successfully',
     };
   }
 }
