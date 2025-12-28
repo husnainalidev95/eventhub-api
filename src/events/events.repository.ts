@@ -47,6 +47,8 @@ export class EventsRepository extends BaseRepository<Event> {
       featured?: boolean;
       search?: string;
       organizerId?: string;
+      minPrice?: number;
+      maxPrice?: number;
       skip?: number;
       take?: number;
     },
@@ -81,6 +83,25 @@ export class EventsRepository extends BaseRepository<Event> {
       ];
     }
 
+    // Price filter - filter by MINIMUM (cheapest) ticket price
+    // minPrice: cheapest ticket must be >= minPrice (all tickets must be >= minPrice)
+    // maxPrice: cheapest ticket must be <= maxPrice (at least one ticket must be in valid range)
+    if (filter?.minPrice !== undefined || filter?.maxPrice !== undefined) {
+      if (filter?.minPrice !== undefined && filter?.maxPrice !== undefined) {
+        // Both constraints: cheapest ticket must be in range [minPrice, maxPrice]
+        where.AND = [
+          { ticketTypes: { every: { price: { gte: filter.minPrice } } } }, // All tickets >= minPrice
+          { ticketTypes: { some: { price: { gte: filter.minPrice, lte: filter.maxPrice } } } }, // At least one in range
+        ];
+      } else if (filter?.minPrice !== undefined) {
+        // Only minPrice: all tickets must be >= minPrice (ensures cheapest is >= minPrice)
+        where.ticketTypes = { every: { price: { gte: filter.minPrice } } };
+      } else if (filter?.maxPrice !== undefined) {
+        // Only maxPrice: at least one ticket <= maxPrice
+        where.ticketTypes = { some: { price: { lte: filter.maxPrice } } };
+      }
+    }
+
     return this.getPrismaClient(context).event.findMany({
       where,
       skip: filter?.skip,
@@ -113,6 +134,8 @@ export class EventsRepository extends BaseRepository<Event> {
       featured?: boolean;
       search?: string;
       organizerId?: string;
+      minPrice?: number;
+      maxPrice?: number;
     },
     context?: WithPrisma,
   ): Promise<number> {
@@ -143,6 +166,25 @@ export class EventsRepository extends BaseRepository<Event> {
         { title: { contains: filter.search, mode: 'insensitive' } },
         { description: { contains: filter.search, mode: 'insensitive' } },
       ];
+    }
+
+    // Price filter - filter by MINIMUM (cheapest) ticket price
+    // minPrice: cheapest ticket must be >= minPrice (all tickets must be >= minPrice)
+    // maxPrice: cheapest ticket must be <= maxPrice (at least one ticket must be in valid range)
+    if (filter?.minPrice !== undefined || filter?.maxPrice !== undefined) {
+      if (filter?.minPrice !== undefined && filter?.maxPrice !== undefined) {
+        // Both constraints: cheapest ticket must be in range [minPrice, maxPrice]
+        where.AND = [
+          { ticketTypes: { every: { price: { gte: filter.minPrice } } } }, // All tickets >= minPrice
+          { ticketTypes: { some: { price: { gte: filter.minPrice, lte: filter.maxPrice } } } }, // At least one in range
+        ];
+      } else if (filter?.minPrice !== undefined) {
+        // Only minPrice: all tickets must be >= minPrice (ensures cheapest is >= minPrice)
+        where.ticketTypes = { every: { price: { gte: filter.minPrice } } };
+      } else if (filter?.maxPrice !== undefined) {
+        // Only maxPrice: at least one ticket <= maxPrice
+        where.ticketTypes = { some: { price: { lte: filter.maxPrice } } };
+      }
     }
 
     return this.getPrismaClient(context).event.count({ where });

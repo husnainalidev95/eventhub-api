@@ -1,10 +1,23 @@
-import { Injectable, NotFoundException, ForbiddenException, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ForbiddenException,
+  BadRequestException,
+  Logger,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { UploadService } from '../upload/upload.service';
-import { CreateEventDto, GetEventsQueryDto, UpdateEventDto } from './dto';
+import {
+  CreateEventDto,
+  GetEventsQueryDto,
+  UpdateEventDto,
+  CreateTicketTypeDto,
+  UpdateTicketTypeDto,
+} from './dto';
 import { UserRole } from '@prisma/client';
 import { DEFAULT_EVENT_IMAGE } from '../common/constants';
 import { EventsRepository } from './events.repository';
+import { TicketTypesRepository } from '../bookings/ticket-types.repository';
 
 @Injectable()
 export class EventsService {
@@ -13,6 +26,7 @@ export class EventsService {
   constructor(
     private prisma: PrismaService,
     private eventsRepository: EventsRepository,
+    private ticketTypesRepository: TicketTypesRepository,
     private uploadService: UploadService,
   ) {}
 
@@ -39,7 +53,18 @@ export class EventsService {
   }
 
   async findAll(query: GetEventsQueryDto) {
-    const { page = 1, limit = 10, category, city, search, status, featured, organizerId } = query;
+    const {
+      page = 1,
+      limit = 10,
+      category,
+      city,
+      search,
+      status,
+      featured,
+      organizerId,
+      minPrice,
+      maxPrice,
+    } = query;
     const skip = (page - 1) * limit;
 
     // Get events and total count
@@ -51,6 +76,8 @@ export class EventsService {
         status,
         featured,
         organizerId,
+        minPrice,
+        maxPrice,
         skip,
         take: limit,
       }),
@@ -61,6 +88,8 @@ export class EventsService {
         status,
         featured,
         organizerId,
+        minPrice,
+        maxPrice,
       }),
     ]);
 
@@ -151,6 +180,161 @@ export class EventsService {
     return {
       message: 'Event successfully deleted',
       id,
+    };
+  }
+
+  // Ticket Type Management Methods
+
+  async createTicketType(
+    eventId: string,
+    userId: string,
+    userRole: UserRole,
+    createTicketTypeDto: CreateTicketTypeDto,
+  ) {
+    // Verify event exists and user has permission
+    const event = await this.eventsRepository.findById(eventId);
+
+    if (!event) {
+      throw new NotFoundException(`Event with ID ${eventId} not found`);
+    }
+
+    // Check if user is owner or admin
+    if (event.organizerId !== userId && userRole !== UserRole.ADMIN) {
+      throw new ForbiddenException('You do not have permission to add ticket types to this event');
+    }
+
+    // Create ticket type
+    const ticketType = await this.ticketTypesRepository.create({
+      event: {
+        connect: { id: eventId },
+      },
+      name: createTicketTypeDto.name,
+      price: createTicketTypeDto.price,
+      total: createTicketTypeDto.total,
+      available: createTicketTypeDto.total, // Initially, all tickets are available
+      description: createTicketTypeDto.description,
+    });
+
+    return ticketType;
+  }
+
+  async getTicketTypes(eventId: string) {
+    // Verify event exists
+    const event = await this.eventsRepository.findById(eventId);
+
+    if (!event) {
+      throw new NotFoundException(`Event with ID ${eventId} not found`);
+    }
+
+    // Get all ticket types for this event
+    const ticketTypes = await this.ticketTypesRepository.findAll({ eventId });
+
+    return ticketTypes;
+  }
+
+  async updateTicketType(
+    eventId: string,
+    ticketTypeId: string,
+    userId: string,
+    userRole: UserRole,
+    updateTicketTypeDto: UpdateTicketTypeDto,
+  ) {
+    // Verify event exists and user has permission
+    const event = await this.eventsRepository.findById(eventId);
+
+    if (!event) {
+      throw new NotFoundException(`Event with ID ${eventId} not found`);
+    }
+
+    // Check if user is owner or admin
+    if (event.organizerId !== userId && userRole !== UserRole.ADMIN) {
+      throw new ForbiddenException(
+        'You do not have permission to update ticket types for this event',
+      );
+    }
+
+    // Verify ticket type exists and belongs to this event
+    const ticketType = await this.ticketTypesRepository.findById(ticketTypeId);
+
+    if (!ticketType) {
+      throw new NotFoundException(`Ticket type with ID ${ticketTypeId} not found`);
+    }
+
+    if (ticketType.eventId !== eventId) {
+      throw new BadRequestException('Ticket type does not belong to this event');
+    }
+
+    // Prepare update data
+    const updateData: any = { ...updateTicketTypeDto };
+
+    // If updating quantity, validate it's not less than sold tickets
+    if (updateTicketTypeDto.total !== undefined) {
+      const soldTickets = ticketType.total - ticketType.available;
+      if (updateTicketTypeDto.total < soldTickets) {
+        throw new BadRequestException(
+          `Cannot reduce quantity below ${soldTickets} (tickets already sold)`,
+        );
+      }
+
+      // Update available count if total changes
+      const newAvailable = updateTicketTypeDto.total - soldTickets;
+      updateData.available = newAvailable;
+    }
+
+    // Update ticket type
+    const updatedTicketType = await this.ticketTypesRepository.update(ticketTypeId, updateData);
+
+    return updatedTicketType;
+  }
+
+  async deleteTicketType(
+    eventId: string,
+    ticketTypeId: string,
+    userId: string,
+    userRole: UserRole,
+  ) {
+    // Verify event exists and user has permission
+    const event = await this.eventsRepository.findById(eventId);
+
+    if (!event) {
+      throw new NotFoundException(`Event with ID ${eventId} not found`);
+    }
+
+    // Check if user is owner or admin
+    if (event.organizerId !== userId && userRole !== UserRole.ADMIN) {
+      throw new ForbiddenException(
+        'You do not have permission to delete ticket types for this event',
+      );
+    }
+
+    // Verify ticket type exists and belongs to this event
+    const ticketType = await this.ticketTypesRepository.findById(ticketTypeId);
+
+    if (!ticketType) {
+      throw new NotFoundException(`Ticket type with ID ${ticketTypeId} not found`);
+    }
+
+    if (ticketType.eventId !== eventId) {
+      throw new BadRequestException('Ticket type does not belong to this event');
+    }
+
+    // Check if tickets have been sold
+    const soldTickets = ticketType.total - ticketType.available;
+    if (soldTickets > 0) {
+      throw new BadRequestException(
+        `Cannot delete ticket type with ${soldTickets} tickets already sold`,
+      );
+    }
+
+    // Check for active holds in Redis (optional - could check Redis for active holds)
+    // For now, we'll allow deletion if no tickets sold
+
+    // Delete ticket type
+    await this.ticketTypesRepository.delete(ticketTypeId);
+
+    return {
+      message: 'Ticket type deleted successfully',
+      id: ticketTypeId,
     };
   }
 }

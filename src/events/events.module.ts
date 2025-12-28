@@ -5,6 +5,7 @@ import { EventsController } from './events.controller';
 import { EventsService } from './events.service';
 import { EventsGateway } from './events.gateway';
 import { EventsRepository } from './events.repository';
+import { TicketTypesRepository } from '../bookings/ticket-types.repository';
 import { PrismaModule } from '../prisma/prisma.module';
 import { UploadModule } from '../upload/upload.module';
 
@@ -22,7 +23,7 @@ import { UploadModule } from '../upload/upload.module';
     }),
   ],
   controllers: [EventsController],
-  providers: [EventsService, EventsRepository, EventsGateway],
+  providers: [EventsService, EventsRepository, EventsGateway, TicketTypesRepository],
   exports: [EventsService, EventsGateway],
 })
 export class EventsModule {}

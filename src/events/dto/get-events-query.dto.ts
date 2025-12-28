@@ -76,4 +76,26 @@ export class GetEventsQueryDto {
   @IsOptional()
   @IsString()
   organizerId?: string;
+
+  @ApiProperty({
+    required: false,
+    description: 'Minimum ticket price',
+    example: 10,
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  minPrice?: number;
+
+  @ApiProperty({
+    required: false,
+    description: 'Maximum ticket price',
+    example: 100,
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  maxPrice?: number;
 }
