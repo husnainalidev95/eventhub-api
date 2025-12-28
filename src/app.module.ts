@@ -13,6 +13,7 @@ import { UploadModule } from './upload/upload.module';
 import { PaymentModule } from './payment/payment.module';
 import { QueuesModule } from './queues/queues.module';
 import { CommonModule } from './common/common.module';
+import { AdminModule } from './admin/admin.module';
 
 @Module({
   imports: [
@@ -31,6 +32,7 @@ import { CommonModule } from './common/common.module';
     PaymentModule,
     QueuesModule,
     CommonModule,
+    AdminModule,
   ],
   controllers: [AppController],
   providers: [AppService],
