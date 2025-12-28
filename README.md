@@ -490,6 +490,8 @@ enum PaymentStatus {
 ### Events
 - `GET /api/events` - List all active events (public)
   - Query params: `?organizerId={id}` - Filter by organizer (get organizer's events)
+  - Query params: `?minPrice={number}&maxPrice={number}` - Filter by price range
+  - Query params: `?search={text}&city={name}&category={type}&status={status}&featured={boolean}`
   - Query params: `?city={city}&status={status}&search={keyword}` - Other filters
 - `GET /api/events/:id` - Get event details (public)
 - `POST /api/events` - Create event (organizer only)
