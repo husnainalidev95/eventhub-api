@@ -14,6 +14,9 @@ import { PaymentModule } from './payment/payment.module';
 import { QueuesModule } from './queues/queues.module';
 import { CommonModule } from './common/common.module';
 import { AdminModule } from './admin/admin.module';
+import { ContactModule } from './contact/contact.module';
+import { OrganizerModule } from './organizer/organizer.module';
+import { NotificationsModule } from './notifications/notifications.module';
 
 @Module({
   imports: [
@@ -33,6 +36,9 @@ import { AdminModule } from './admin/admin.module';
     QueuesModule,
     CommonModule,
     AdminModule,
+    ContactModule,
+    OrganizerModule,
+    NotificationsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

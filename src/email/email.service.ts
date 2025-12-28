@@ -8,6 +8,8 @@ import {
   eventReminderTemplate,
   emailVerificationTemplate,
   passwordResetTemplate,
+  contactFormAdminTemplate,
+  contactFormAutoReplyTemplate,
 } from './templates';
 
 @Injectable()
@@ -245,6 +247,74 @@ export class EmailService {
       return data;
     } catch (error) {
       this.logger.error('Error sending password reset email', error);
+      throw error;
+    }
+  }
+
+  async sendContactFormAdminNotification(
+    adminEmail: string,
+    contactData: {
+      name: string;
+      email: string;
+      subject: string;
+      message: string;
+    },
+  ) {
+    if (!this.resend) {
+      this.logger.warn('Email service not configured. Skipping contact form admin notification.');
+      return null;
+    }
+
+    try {
+      const { data, error } = await this.resend.emails.send({
+        from: 'EventHub <onboarding@resend.dev>',
+        to: adminEmail,
+        subject: `New Contact Form: ${contactData.subject}`,
+        html: contactFormAdminTemplate(contactData),
+      });
+
+      if (error) {
+        this.logger.error('Failed to send contact form admin notification', error);
+        throw error;
+      }
+
+      this.logger.log(`Contact form admin notification sent to ${adminEmail}`);
+      return data;
+    } catch (error) {
+      this.logger.error('Error sending contact form admin notification', error);
+      throw error;
+    }
+  }
+
+  async sendContactFormAutoReply(
+    to: string,
+    contactData: {
+      name: string;
+      subject: string;
+    },
+  ) {
+    if (!this.resend) {
+      this.logger.warn('Email service not configured. Skipping contact form auto-reply.');
+      return null;
+    }
+
+    try {
+      const { data, error } = await this.resend.emails.send({
+        from: 'EventHub <onboarding@resend.dev>',
+        to,
+        subject: 'Thank You for Contacting EventHub',
+        html: contactFormAutoReplyTemplate(contactData),
+      });
+
+      if (error) {
+        this.logger.error('Failed to send contact form auto-reply', error);
+        throw error;
+      }
+
+      this.logger.log(`Contact form auto-reply sent to ${to}`);
+      return data;
+    } catch (error) {
+      this.logger.error('Error sending contact form auto-reply', error);
       throw error;
     }
   }

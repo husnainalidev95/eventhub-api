@@ -52,11 +52,14 @@ model User {
   isActive      Boolean  @default(true)
   emailVerified Boolean  @default(false)
   companyName   String?
+  description   String?  @db.Text // Organizer description/bio
+  website       String?   // Organizer website URL
 
   // Relations
-  events   Event[]
-  bookings Booking[]
-  tickets  Ticket[]
+  events        Event[]
+  bookings      Booking[]
+  tickets       Ticket[]
+  notifications Notification[]
 
   @@map("users")
 }
@@ -157,4 +160,23 @@ model Ticket {
   ticketType TicketType @relation(fields: [ticketTypeId], references: [id], onDelete: Cascade)
 
   @@map("tickets")
+}
+
+// Notification Model
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  type      String   // e.g., 'BOOKING_CONFIRMED', 'EVENT_CANCELLED', 'TICKET_READY', etc.
+  title     String
+  message   String   @db.Text
+  data      Json?    // Additional data as JSON
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead])
+  @@index([userId, createdAt])
+  @@map("notifications")
 }
