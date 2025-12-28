@@ -4,6 +4,7 @@ import {
   Get,
   Body,
   Param,
+  Query,
   UseGuards,
   HttpCode,
   HttpStatus,
@@ -16,7 +17,12 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { OrganizerService } from './organizer.service';
 import { UserRole } from '@prisma/client';
 
-import { UpdateOrganizerProfileDto, OrganizerPublicResponseDto } from './dto';
+import {
+  UpdateOrganizerProfileDto,
+  OrganizerPublicResponseDto,
+  GetRevenueAnalyticsQueryDto,
+  GetBookingAnalyticsQueryDto,
+} from './dto';
 
 interface AuthenticatedUser {
   id: string;
@@ -59,6 +65,42 @@ export class OrganizerController {
   @ApiResponse({ status: 404, description: 'Organizer not found' })
   async getPublicOrganizerProfile(@Param('id') id: string) {
     return this.organizerService.getPublicOrganizerProfile(id);
+  }
+
+  @Get('analytics/revenue')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ORGANIZER, UserRole.ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get revenue analytics - Organizer or Admin only' })
+  @ApiResponse({
+    status: 200,
+    description: 'Revenue analytics retrieved successfully',
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden - Not an organizer or admin' })
+  async getRevenueAnalytics(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query() query: GetRevenueAnalyticsQueryDto,
+  ) {
+    return this.organizerService.getRevenueAnalytics(user.id, query);
+  }
+
+  @Get('analytics/bookings')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ORGANIZER, UserRole.ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get booking analytics - Organizer or Admin only' })
+  @ApiResponse({
+    status: 200,
+    description: 'Booking analytics retrieved successfully',
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden - Not an organizer or admin' })
+  async getBookingAnalytics(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query() query: GetBookingAnalyticsQueryDto,
+  ) {
+    return this.organizerService.getBookingAnalytics(user.id, query);
   }
 }
 

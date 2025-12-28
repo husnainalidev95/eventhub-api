@@ -281,4 +281,54 @@ export class EventsController {
   async cancelEvent(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
     return this.eventsService.cancelEvent(id, user.id, user.role);
   }
+
+  @Get(':id/analytics')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ORGANIZER, UserRole.ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get event-specific analytics - Organizer or Admin only' })
+  @ApiResponse({
+    status: 200,
+    description: 'Event analytics retrieved successfully',
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden - Not event owner or admin' })
+  @ApiResponse({ status: 404, description: 'Event not found' })
+  async getEventAnalytics(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
+    return this.eventsService.getEventAnalytics(id, user.id, user.role);
+  }
+
+  @Post(':id/duplicate')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ORGANIZER, UserRole.ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Duplicate/clone an event - Organizer or Admin only' })
+  @ApiResponse({
+    status: 201,
+    description: 'Event duplicated successfully',
+    type: EventResponseDto,
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden - Not event owner or admin' })
+  @ApiResponse({ status: 404, description: 'Event not found' })
+  async duplicateEvent(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
+    return this.eventsService.duplicateEvent(id, user.id, user.role);
+  }
+
+  @Patch(':id/feature')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ORGANIZER, UserRole.ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Toggle featured status of an event - Organizer or Admin only' })
+  @ApiResponse({
+    status: 200,
+    description: 'Featured status toggled successfully',
+    type: EventResponseDto,
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden - Not event owner or admin' })
+  @ApiResponse({ status: 404, description: 'Event not found' })
+  async toggleFeaturedStatus(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
+    return this.eventsService.toggleFeaturedStatus(id, user.id, user.role);
+  }
 }

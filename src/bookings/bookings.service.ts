@@ -27,6 +27,7 @@ import { TicketTypesRepository } from './ticket-types.repository';
 import { TicketsRepository } from './tickets.repository';
 import { EventsRepository } from '../events/events.repository';
 import { UsersRepository } from '../auth/users.repository';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class BookingsService {
@@ -43,6 +44,7 @@ export class BookingsService {
     @Inject(forwardRef(() => EventsGateway))
     private eventsGateway: EventsGateway,
     @InjectQueue('email') private emailQueue: Queue,
+    private notificationsService: NotificationsService,
   ) {}
 
   async createHold(userId: string, createHoldDto: CreateHoldDto): Promise<HoldResponseDto> {
@@ -220,7 +222,27 @@ export class BookingsService {
     // 7. Fetch complete booking with relations
     const completeBooking = await this.bookingsRepository.findById(booking.id);
 
-    // 8. Emit real-time updates
+    // 8. Create notification for booking confirmation
+    try {
+      const event = await this.eventsRepository.findById(completeBooking.eventId);
+      await this.notificationsService.createNotification(
+        userId,
+        'BOOKING_CONFIRMED',
+        'Booking Confirmed',
+        `Your booking for "${event.title}" has been confirmed. Booking code: ${completeBooking.bookingCode}`,
+        {
+          bookingId: completeBooking.id,
+          bookingCode: completeBooking.bookingCode,
+          eventId: completeBooking.eventId,
+          eventTitle: event.title,
+        },
+      );
+    } catch (notifError) {
+      // Log error but don't fail the booking creation
+      console.error('Failed to create booking confirmation notification:', notifError);
+    }
+
+    // 9. Emit real-time updates
     this.eventsGateway.emitBookingCreated(userId, completeBooking);
     this.eventsGateway.emitTicketAvailabilityUpdate(
       holdData.eventId,
@@ -252,7 +274,7 @@ export class BookingsService {
           }),
           eventTime: completeBooking.event.time,
           eventVenue: completeBooking.event.venue,
-          eventCity: completeBooking.event.city,
+          eventCity: completeBooking.event.cityRef?.name || 'Unknown',
           ticketType: completeBooking.ticketType.name,
           quantity: completeBooking.quantity,
           totalAmount: completeBooking.totalAmount,
@@ -368,7 +390,27 @@ export class BookingsService {
       );
     });
 
-    // 5. Emit real-time updates
+    // 5. Create notification for booking cancellation
+    try {
+      const event = await this.eventsRepository.findById(booking.eventId);
+      await this.notificationsService.createNotification(
+        userId,
+        'BOOKING_CANCELLED',
+        'Booking Cancelled',
+        `Your booking for "${event.title}" has been cancelled. Booking code: ${booking.bookingCode}`,
+        {
+          bookingId: booking.id,
+          bookingCode: booking.bookingCode,
+          eventId: booking.eventId,
+          eventTitle: event.title,
+        },
+      );
+    } catch (notifError) {
+      // Log error but don't fail the cancellation
+      console.error('Failed to create booking cancellation notification:', notifError);
+    }
+
+    // 6. Emit real-time updates
     this.eventsGateway.emitBookingCancelled(userId, bookingId);
 
     // Get updated ticket type to emit availability
@@ -379,7 +421,7 @@ export class BookingsService {
       updatedTicketType.available,
     );
 
-    // 6. Process refund if payment was made
+    // 7. Process refund if payment was made
     if (booking.paymentId && booking.paymentStatus === 'PAID') {
       try {
         await this.paymentService.createRefund(booking.paymentId);
@@ -579,6 +621,27 @@ export class BookingsService {
       const updatedBooking = await this.bookingsRepository.update(bookingId, {
         paymentStatus: 'REFUNDED',
       });
+
+      // Create notification for refund
+      try {
+        const event = await this.eventsRepository.findById(booking.eventId);
+        await this.notificationsService.createNotification(
+          booking.userId,
+          'REFUND_PROCESSED',
+          'Refund Processed',
+          `Your refund for booking "${booking.bookingCode}" (${event.title}) has been processed.`,
+          {
+            bookingId: booking.id,
+            bookingCode: booking.bookingCode,
+            eventId: booking.eventId,
+            eventTitle: event.title,
+            refundAmount: booking.totalAmount,
+          },
+        );
+      } catch (notifError) {
+        // Log error but don't fail the refund
+        console.error('Failed to create refund notification:', notifError);
+      }
 
       // Emit WebSocket event
       this.eventsGateway.emitBookingUpdated(booking.userId, updatedBooking);

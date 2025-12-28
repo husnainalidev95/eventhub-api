@@ -11,12 +11,16 @@ import { PrismaModule } from '../prisma/prisma.module';
 import { UploadModule } from '../upload/upload.module';
 import { PaymentModule } from '../payment/payment.module';
 import { QueuesModule } from '../queues/queues.module';
+import { NotificationsModule } from '../notifications/notifications.module';
+import { CategoriesRepository } from '../common/repositories/categories.repository';
+import { CitiesRepository } from '../common/repositories/cities.repository';
 
 @Module({
   imports: [
     PrismaModule,
     UploadModule,
     QueuesModule,
+    NotificationsModule,
     forwardRef(() => PaymentModule),
     JwtModule.registerAsync({
       imports: [ConfigModule],
@@ -28,7 +32,15 @@ import { QueuesModule } from '../queues/queues.module';
     }),
   ],
   controllers: [EventsController],
-  providers: [EventsService, EventsRepository, EventsGateway, TicketTypesRepository, BookingsRepository],
+  providers: [
+    EventsService,
+    EventsRepository,
+    EventsGateway,
+    TicketTypesRepository,
+    BookingsRepository,
+    CategoriesRepository,
+    CitiesRepository,
+  ],
   exports: [EventsService, EventsGateway],
 })
 export class EventsModule {}

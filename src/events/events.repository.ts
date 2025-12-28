@@ -41,8 +41,8 @@ export class EventsRepository extends BaseRepository<Event> {
    */
   async findAll(
     filter?: {
-      category?: string;
-      city?: string;
+      categoryId?: string;
+      cityId?: string;
       status?: string;
       featured?: boolean;
       search?: string;
@@ -56,12 +56,12 @@ export class EventsRepository extends BaseRepository<Event> {
   ) {
     const where: Prisma.EventWhereInput = {};
 
-    if (filter?.category) {
-      where.category = filter.category;
+    if (filter?.categoryId) {
+      where.categoryId = filter.categoryId;
     }
 
-    if (filter?.city) {
-      where.city = filter.city;
+    if (filter?.cityId) {
+      where.cityId = filter.cityId;
     }
 
     if (filter?.status) {
@@ -128,8 +128,8 @@ export class EventsRepository extends BaseRepository<Event> {
    */
   async count(
     filter?: {
-      category?: string;
-      city?: string;
+      categoryId?: string;
+      cityId?: string;
       status?: string;
       featured?: boolean;
       search?: string;
@@ -141,12 +141,12 @@ export class EventsRepository extends BaseRepository<Event> {
   ): Promise<number> {
     const where: Prisma.EventWhereInput = {};
 
-    if (filter?.category) {
-      where.category = filter.category;
+    if (filter?.categoryId) {
+      where.categoryId = filter.categoryId;
     }
 
-    if (filter?.city) {
-      where.city = filter.city;
+    if (filter?.cityId) {
+      where.cityId = filter.cityId;
     }
 
     if (filter?.status) {

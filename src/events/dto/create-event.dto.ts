@@ -24,9 +24,12 @@ export class CreateEventDto {
   @IsString()
   description: string;
 
-  @ApiProperty({ example: 'Music', description: 'Event category' })
+  @ApiProperty({
+    example: 'clx0z9m00000008ju00000000',
+    description: 'Category ID (required)',
+  })
   @IsString()
-  category: string;
+  categoryId: string;
 
   @ApiProperty({
     example:
@@ -49,9 +52,12 @@ export class CreateEventDto {
   @IsString()
   time: string;
 
-  @ApiProperty({ example: 'New York', description: 'City' })
+  @ApiProperty({
+    example: 'clx0z9m00000008ju00000001',
+    description: 'City ID (required)',
+  })
   @IsString()
-  city: string;
+  cityId: string;
 
   @ApiProperty({ example: 'Madison Square Garden', description: 'Venue name' })
   @IsString()

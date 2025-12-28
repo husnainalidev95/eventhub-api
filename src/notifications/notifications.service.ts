@@ -100,5 +100,32 @@ export class NotificationsService {
       count,
     };
   }
+
+  async createNotification(
+    userId: string,
+    type: string,
+    title: string,
+    message: string,
+    data?: any,
+  ): Promise<NotificationResponseDto> {
+    const notification = await this.notificationsRepository.create({
+      user: { connect: { id: userId } },
+      type,
+      title,
+      message,
+      data: data || null,
+      isRead: false,
+    });
+
+    return {
+      id: notification.id,
+      type: notification.type,
+      title: notification.title,
+      message: notification.message,
+      data: notification.data as any,
+      isRead: notification.isRead,
+      createdAt: notification.createdAt,
+    };
+  }
 }
 

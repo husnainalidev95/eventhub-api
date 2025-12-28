@@ -1,11 +1,15 @@
 import { Controller, Get } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
-import { PrismaService } from '../prisma/prisma.service';
+import { CategoriesRepository } from './repositories/categories.repository';
+import { CitiesRepository } from './repositories/cities.repository';
 
 @ApiTags('Common')
 @Controller()
 export class CommonController {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly categoriesRepository: CategoriesRepository,
+    private readonly citiesRepository: CitiesRepository,
+  ) {}
 
   @Get('categories')
   @ApiOperation({ summary: 'Get all event categories with event counts' })
@@ -20,7 +24,11 @@ export class CommonController {
           items: {
             type: 'object',
             properties: {
+              id: { type: 'string' },
               name: { type: 'string' },
+              slug: { type: 'string' },
+              icon: { type: 'string', nullable: true },
+              description: { type: 'string', nullable: true },
               eventCount: { type: 'number' },
             },
           },
@@ -29,49 +37,36 @@ export class CommonController {
     },
   })
   async getCategories() {
-    // Get distinct categories with event counts
-    const events = await this.prisma.event.findMany({
-      where: {
-        status: 'ACTIVE', // Only count active events
-      },
-      select: {
-        category: true,
-      },
-    });
+    // Get all categories with event counts (only active events)
+    const categories = await this.categoriesRepository.findAll();
 
-    // Count events per category (case-insensitive grouping)
-    const categoryMap = new Map<string, { name: string; count: number }>();
-    events.forEach((event) => {
-      // Normalize to lowercase for grouping, but keep original for display
-      const normalizedKey = event.category.toLowerCase().trim();
-      const existing = categoryMap.get(normalizedKey);
+    // Filter and map to include only categories with active events
+    const categoriesWithCounts = await Promise.all(
+      categories.map(async (category) => {
+        // Count only active events for this category
+        const eventCount = await this.categoriesRepository.countEventsByCategory(category.id);
+        return {
+          id: category.id,
+          name: category.name,
+          slug: category.slug,
+          icon: category.icon,
+          description: category.description,
+          eventCount,
+        };
+      }),
+    );
 
-      if (existing) {
-        existing.count += 1;
-        // Keep the most common casing (or first encountered)
-      } else {
-        categoryMap.set(normalizedKey, {
-          name: event.category.trim(), // Keep original casing
-          count: 1,
-        });
-      }
-    });
+    // Filter out categories with no active events and sort
+    const activeCategories = categoriesWithCounts
+      .filter((cat) => cat.eventCount > 0)
+      .sort((a, b) => {
+        if (b.eventCount !== a.eventCount) {
+          return b.eventCount - a.eventCount;
+        }
+        return a.name.localeCompare(b.name);
+      });
 
-    // Convert to array format
-    const categories = Array.from(categoryMap.values()).map(({ name, count }) => ({
-      name,
-      eventCount: count,
-    }));
-
-    // Sort by event count (descending), then by name (ascending)
-    categories.sort((a, b) => {
-      if (b.eventCount !== a.eventCount) {
-        return b.eventCount - a.eventCount;
-      }
-      return a.name.localeCompare(b.name);
-    });
-
-    return { categories };
+    return { categories: activeCategories };
   }
 
   @Get('cities')
@@ -87,7 +82,10 @@ export class CommonController {
           items: {
             type: 'object',
             properties: {
+              id: { type: 'string' },
               name: { type: 'string' },
+              state: { type: 'string', nullable: true },
+              country: { type: 'string' },
               eventCount: { type: 'number' },
             },
           },
@@ -96,48 +94,34 @@ export class CommonController {
     },
   })
   async getCities() {
-    // Get distinct cities with event counts
-    const events = await this.prisma.event.findMany({
-      where: {
-        status: 'ACTIVE', // Only count active events
-      },
-      select: {
-        city: true,
-      },
-    });
+    // Get all cities with event counts (only active events)
+    const cities = await this.citiesRepository.findAll();
 
-    // Count events per city (case-insensitive grouping)
-    const cityMap = new Map<string, { name: string; count: number }>();
-    events.forEach((event) => {
-      // Normalize to lowercase for grouping, but keep original for display
-      const normalizedKey = event.city.toLowerCase().trim();
-      const existing = cityMap.get(normalizedKey);
+    // Filter and map to include only cities with active events
+    const citiesWithCounts = await Promise.all(
+      cities.map(async (city) => {
+        // Count only active events for this city
+        const eventCount = await this.citiesRepository.countEventsByCity(city.id);
+        return {
+          id: city.id,
+          name: city.name,
+          state: city.state,
+          country: city.country,
+          eventCount,
+        };
+      }),
+    );
 
-      if (existing) {
-        existing.count += 1;
-        // Keep the most common casing (or first encountered)
-      } else {
-        cityMap.set(normalizedKey, {
-          name: event.city.trim(), // Keep original casing
-          count: 1,
-        });
-      }
-    });
+    // Filter out cities with no active events and sort
+    const activeCities = citiesWithCounts
+      .filter((city) => city.eventCount > 0)
+      .sort((a, b) => {
+        if (b.eventCount !== a.eventCount) {
+          return b.eventCount - a.eventCount;
+        }
+        return a.name.localeCompare(b.name);
+      });
 
-    // Convert to array format
-    const cities = Array.from(cityMap.values()).map(({ name, count }) => ({
-      name,
-      eventCount: count,
-    }));
-
-    // Sort by event count (descending), then by name (ascending)
-    cities.sort((a, b) => {
-      if (b.eventCount !== a.eventCount) {
-        return b.eventCount - a.eventCount;
-      }
-      return a.name.localeCompare(b.name);
-    });
-
-    return { cities };
+    return { cities: activeCities };
   }
 }

@@ -538,16 +538,16 @@ export class AdminService {
 
     // Get category distribution
     const categoryDistribution = await this.prisma.event.groupBy({
-      by: ['category'],
+      by: ['categoryId'],
       where: { createdAt: dateFilter },
-      _count: { category: true },
+      _count: { categoryId: true },
     });
 
     // Get city distribution
     const cityDistribution = await this.prisma.event.groupBy({
-      by: ['city'],
+      by: ['cityId'],
       where: { createdAt: dateFilter },
-      _count: { city: true },
+      _count: { cityId: true },
     });
 
     return {
@@ -569,10 +569,10 @@ export class AdminService {
           count: e._count.status,
         })),
         categories: categoryDistribution
-          .map((c) => ({ category: c.category, count: c._count.category }))
+          .map((c) => ({ categoryId: c.categoryId, count: c._count.categoryId }))
           .sort((a, b) => b.count - a.count),
         cities: cityDistribution
-          .map((c) => ({ city: c.city, count: c._count.city }))
+          .map((c) => ({ cityId: c.cityId, count: c._count.cityId }))
           .sort((a, b) => b.count - a.count),
       },
       topEvents: topEvents.map((event) => ({

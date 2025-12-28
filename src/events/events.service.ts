@@ -26,6 +26,9 @@ import { PaymentService } from '../payment/payment.service';
 import { InjectQueue } from '@nestjs/bull';
 import { Queue } from 'bullmq';
 import { CancellationEmailJob } from '../queues/processors/email.processor';
+import { NotificationsService } from '../notifications/notifications.service';
+import { CategoriesRepository } from '../common/repositories/categories.repository';
+import { CitiesRepository } from '../common/repositories/cities.repository';
 
 @Injectable()
 export class EventsService {
@@ -42,13 +45,34 @@ export class EventsService {
     @Inject(forwardRef(() => PaymentService))
     private paymentService: PaymentService,
     @InjectQueue('email') private emailQueue: Queue,
+    private notificationsService: NotificationsService,
+    private categoriesRepository: CategoriesRepository,
+    private citiesRepository: CitiesRepository,
   ) {}
 
   async create(userId: string, userName: string, createEventDto: CreateEventDto) {
-    const { ticketTypes, ...eventData } = createEventDto;
+    const { ticketTypes, categoryId, cityId, ...eventData } = createEventDto;
+
+    // Validate categoryId exists
+    const categoryRecord = await this.categoriesRepository.findById(categoryId);
+    if (!categoryRecord) {
+      throw new BadRequestException(`Category with ID ${categoryId} not found`);
+    }
+
+    // Validate cityId exists
+    const cityRecord = await this.citiesRepository.findById(cityId);
+    if (!cityRecord) {
+      throw new BadRequestException(`City with ID ${cityId} not found`);
+    }
 
     const event = await this.eventsRepository.create({
       ...eventData,
+      categoryRef: {
+        connect: { id: categoryId },
+      },
+      cityRef: {
+        connect: { id: cityId },
+      },
       image: eventData.image || DEFAULT_EVENT_IMAGE, // Use default if no image provided
       date: new Date(eventData.date),
       organizer: {
@@ -70,8 +94,8 @@ export class EventsService {
     const {
       page = 1,
       limit = 10,
-      category,
-      city,
+      categoryId,
+      cityId,
       search,
       status,
       featured,
@@ -84,8 +108,8 @@ export class EventsService {
     // Get events and total count
     const [events, total] = await Promise.all([
       this.eventsRepository.findAll({
-        category,
-        city,
+        categoryId,
+        cityId,
         search,
         status,
         featured,
@@ -96,8 +120,8 @@ export class EventsService {
         take: limit,
       }),
       this.eventsRepository.count({
-        category,
-        city,
+        categoryId,
+        cityId,
         search,
         status,
         featured,
@@ -155,11 +179,58 @@ export class EventsService {
       }
     }
 
+    // Handle category and city updates (only IDs, no backward compatibility)
+    const { categoryId, cityId, ...restUpdateData } = updateEventDto;
+    const updateData: any = { ...restUpdateData };
+
+    if (categoryId !== undefined) {
+      // Validate categoryId exists
+      const categoryRecord = await this.categoriesRepository.findById(categoryId);
+      if (!categoryRecord) {
+        throw new BadRequestException(`Category with ID ${categoryId} not found`);
+      }
+      updateData.categoryRef = { connect: { id: categoryId } };
+    }
+
+    if (cityId !== undefined) {
+      // Validate cityId exists
+      const cityRecord = await this.citiesRepository.findById(cityId);
+      if (!cityRecord) {
+        throw new BadRequestException(`City with ID ${cityId} not found`);
+      }
+      updateData.cityRef = { connect: { id: cityId } };
+    }
+
     // Update the event
     const updatedEvent = await this.eventsRepository.update(id, {
-      ...updateEventDto,
+      ...updateData,
       ...(updateEventDto.date && { date: new Date(updateEventDto.date) }),
     });
+
+    // Create notifications for users with CONFIRMED bookings for this event
+    try {
+      const bookings = await this.bookingsRepository.findAll({ eventId: id, status: 'CONFIRMED' });
+      const userIds = [...new Set(bookings.map((b) => b.userId))];
+
+      for (const bookingUserId of userIds) {
+        await this.notificationsService.createNotification(
+          bookingUserId,
+          'EVENT_UPDATED',
+          'Event Updated',
+          `The event "${updatedEvent.title}" has been updated. Please check the event details.`,
+          {
+            eventId: id,
+            eventTitle: updatedEvent.title,
+          },
+        );
+      }
+    } catch (notifError) {
+      // Log error but don't fail the update
+      this.logger.error('Failed to create event update notifications:', notifError);
+    }
+
+    // Emit WebSocket event
+    this.eventsGateway.emitEventUpdated(id, updatedEvent);
 
     return updatedEvent;
   }
@@ -521,6 +592,25 @@ export class EventsService {
           );
         }
 
+        // Create notification for event cancellation
+        try {
+          await this.notificationsService.createNotification(
+            booking.userId,
+            'EVENT_CANCELLED',
+            'Event Cancelled',
+            `The event "${event.title}" has been cancelled. Your booking (${booking.bookingCode}) has been cancelled${booking.paymentId && booking.paymentStatus === 'PAID' ? ' and refunded' : ''}.`,
+            {
+              eventId: id,
+              eventTitle: event.title,
+              bookingId: booking.id,
+              bookingCode: booking.bookingCode,
+              refunded: booking.paymentId && booking.paymentStatus === 'PAID',
+            },
+          );
+        } catch (notifError) {
+          this.logger.error(`Failed to create cancellation notification for booking ${booking.bookingCode}:`, notifError);
+        }
+
         // Emit WebSocket event for booking cancellation
         this.eventsGateway.emitBookingCancelled(booking.userId, booking.id);
       } catch (error) {
@@ -538,5 +628,275 @@ export class EventsService {
       ...updatedEvent,
       cancelledBookings: bookings.length,
     };
+  }
+
+  /**
+   * Get event-specific analytics
+   */
+  async getEventAnalytics(eventId: string, userId: string, userRole: UserRole) {
+    const event = await this.eventsRepository.findById(eventId);
+
+    if (!event) {
+      throw new NotFoundException(`Event with ID ${eventId} not found`);
+    }
+
+    // Verify event ownership
+    if (event.organizerId !== userId && userRole !== UserRole.ADMIN) {
+      throw new ForbiddenException('You do not have permission to view analytics for this event');
+    }
+
+    // Get all bookings for this event
+    const bookings = await this.bookingsRepository.findAll({ eventId });
+
+    // Calculate booking statistics
+    const totalBookings = bookings.length;
+    const bookingsByStatus = bookings.reduce((acc, booking) => {
+      acc[booking.status] = (acc[booking.status] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+
+    // Calculate revenue
+    const totalRevenue = bookings
+      .filter(
+        (b) =>
+          (b.status === 'CONFIRMED' || b.status === 'COMPLETED') &&
+          b.paymentStatus === 'PAID',
+      )
+      .reduce((sum, booking) => sum + booking.totalAmount, 0);
+
+    // Get tickets
+    const tickets = await this.prisma.ticket.findMany({
+      where: {
+        eventId,
+      },
+      select: {
+        status: true,
+        bookingId: true,
+      },
+    });
+
+    const totalTickets = tickets.length;
+    const ticketsByStatus = tickets.reduce((acc, ticket) => {
+      acc[ticket.status] = (acc[ticket.status] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+
+    // Calculate booking trends over time (by day)
+    const bookingTrends: Record<string, { count: number; revenue: number }> = {};
+    bookings.forEach((booking) => {
+      const date = new Date(booking.createdAt);
+      const key = date.toISOString().split('T')[0]; // YYYY-MM-DD
+
+      if (!bookingTrends[key]) {
+        bookingTrends[key] = { count: 0, revenue: 0 };
+      }
+      bookingTrends[key].count += 1;
+      if (
+        (booking.status === 'CONFIRMED' || booking.status === 'COMPLETED') &&
+        booking.paymentStatus === 'PAID'
+      ) {
+        bookingTrends[key].revenue += booking.totalAmount;
+      }
+    });
+
+    // Calculate demographics
+    const avgTicketsPerBooking =
+      totalBookings > 0 ? totalTickets / totalBookings : 0;
+
+    // Get unique users who booked
+    const uniqueUsers = new Set(bookings.map((b) => b.userId));
+    const totalUniqueCustomers = uniqueUsers.size;
+
+    // Calculate returning customers (users with multiple bookings for this event)
+    const userBookingCounts: Record<string, number> = {};
+    bookings.forEach((booking) => {
+      userBookingCounts[booking.userId] = (userBookingCounts[booking.userId] || 0) + 1;
+    });
+    const returningCustomers = Object.values(userBookingCounts).filter((count) => count > 1)
+      .length;
+
+    // Revenue breakdown by ticket type
+    const revenueByTicketType = await this.prisma.booking.groupBy({
+      by: ['ticketTypeId'],
+      where: {
+        eventId,
+        status: {
+          in: ['CONFIRMED', 'COMPLETED'],
+        },
+        paymentStatus: 'PAID',
+      },
+      _sum: {
+        totalAmount: true,
+      },
+      _count: {
+        id: true,
+      },
+    });
+
+    // Get ticket type details
+    const ticketTypeBreakdown = await Promise.all(
+      revenueByTicketType.map(async (item) => {
+        const ticketType = await this.prisma.ticketType.findUnique({
+          where: { id: item.ticketTypeId },
+          select: {
+            id: true,
+            name: true,
+            price: true,
+            total: true,
+            available: true,
+          },
+        });
+        return {
+          ticketTypeId: item.ticketTypeId,
+          ticketTypeName: ticketType?.name || 'Unknown',
+          ticketTypePrice: ticketType?.price || 0,
+          totalTickets: ticketType?.total || 0,
+          availableTickets: ticketType?.available || 0,
+          soldTickets: (ticketType?.total || 0) - (ticketType?.available || 0),
+          revenue: item._sum.totalAmount || 0,
+          bookingCount: item._count.id,
+        };
+      }),
+    );
+
+    return {
+      event: {
+        id: event.id,
+        title: event.title,
+        date: event.date,
+        status: event.status,
+      },
+      summary: {
+        totalBookings,
+        totalTickets,
+        totalRevenue,
+        totalUniqueCustomers,
+        returningCustomers,
+        avgTicketsPerBooking: Math.round(avgTicketsPerBooking * 100) / 100,
+      },
+      bookings: {
+        byStatus: Object.entries(bookingsByStatus).map(([status, count]) => ({
+          status,
+          count,
+        })),
+      },
+      tickets: {
+        byStatus: Object.entries(ticketsByStatus).map(([status, count]) => ({
+          status,
+          count,
+        })),
+      },
+      bookingTrends: Object.entries(bookingTrends)
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([date, data]) => ({
+          date,
+          bookingCount: data.count,
+          revenue: data.revenue,
+        })),
+      revenueByTicketType: ticketTypeBreakdown,
+    };
+  }
+
+  /**
+   * Duplicate/clone an event
+   */
+  async duplicateEvent(eventId: string, userId: string, userRole: UserRole) {
+    // Get the original event with ticket types
+    const originalEvent = await this.prisma.event.findUnique({
+      where: { id: eventId },
+      include: {
+        ticketTypes: true,
+        organizer: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+      },
+    });
+
+    if (!originalEvent) {
+      throw new NotFoundException(`Event with ID ${eventId} not found`);
+    }
+
+    // Verify event ownership
+    if (originalEvent.organizerId !== userId && userRole !== UserRole.ADMIN) {
+      throw new ForbiddenException('You do not have permission to duplicate this event');
+    }
+
+    // Calculate new date (30 days from now, or keep original date if it's already in the future)
+    const now = new Date();
+    const originalDate = new Date(originalEvent.date);
+    let newDate: Date;
+
+    if (originalDate > now) {
+      // If original date is in the future, use it
+      newDate = originalDate;
+    } else {
+      // Otherwise, set to 30 days from now
+      newDate = new Date();
+      newDate.setDate(now.getDate() + 30);
+    }
+
+    // Create duplicated event
+    const duplicatedEvent = await this.eventsRepository.create({
+      title: `${originalEvent.title} (Copy)`,
+      description: originalEvent.description,
+      categoryRef: {
+        connect: { id: originalEvent.categoryId },
+      },
+      image: originalEvent.image,
+      date: newDate,
+      time: originalEvent.time,
+      cityRef: {
+        connect: { id: originalEvent.cityId },
+      },
+      venue: originalEvent.venue,
+      address: originalEvent.address,
+      organizer: {
+        connect: { id: originalEvent.organizerId },
+      },
+      organizerName: originalEvent.organizerName,
+      status: 'DRAFT', // Always set to DRAFT
+      featured: false, // Reset featured status
+      ticketTypes: {
+        create: originalEvent.ticketTypes.map((ticketType) => ({
+          name: ticketType.name,
+          description: ticketType.description,
+          price: ticketType.price,
+          total: ticketType.total,
+          available: ticketType.total, // Reset available to total
+        })),
+      },
+    });
+
+    this.logger.log(`Event ${eventId} duplicated as ${duplicatedEvent.id}`);
+
+    return duplicatedEvent;
+  }
+
+  /**
+   * Toggle featured status of an event
+   */
+  async toggleFeaturedStatus(eventId: string, userId: string, userRole: UserRole) {
+    const event = await this.eventsRepository.findById(eventId);
+
+    if (!event) {
+      throw new NotFoundException(`Event with ID ${eventId} not found`);
+    }
+
+    // Verify event ownership or admin
+    if (event.organizerId !== userId && userRole !== UserRole.ADMIN) {
+      throw new ForbiddenException('You do not have permission to toggle featured status for this event');
+    }
+
+    // Toggle featured status
+    const updatedEvent = await this.eventsRepository.update(eventId, {
+      featured: !event.featured,
+    });
+
+    this.logger.log(`Event ${eventId} featured status toggled to ${updatedEvent.featured}`);
+
+    return updatedEvent;
   }
 }

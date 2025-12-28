@@ -23,6 +23,13 @@ export class TicketsRepository extends BaseRepository<Ticket> {
     return this.getPrismaClient(context).ticket.findUnique({
       where: { id },
       include: {
+        ticketType: {
+          select: {
+            id: true,
+            name: true,
+            price: true,
+          },
+        },
         event: {
           select: {
             id: true,
@@ -30,14 +37,14 @@ export class TicketsRepository extends BaseRepository<Ticket> {
             date: true,
             time: true,
             venue: true,
-            city: true,
-          },
-        },
-        ticketType: {
-          select: {
-            id: true,
-            name: true,
-            price: true,
+            cityRef: {
+              select: {
+                id: true,
+                name: true,
+                state: true,
+                country: true,
+              },
+            },
           },
         },
         booking: {
@@ -94,7 +101,14 @@ export class TicketsRepository extends BaseRepository<Ticket> {
             date: true,
             time: true,
             venue: true,
-            city: true,
+            cityRef: {
+              select: {
+                id: true,
+                name: true,
+                state: true,
+                country: true,
+              },
+            },
             address: true,
             image: true,
           },
@@ -222,7 +236,14 @@ export class TicketsRepository extends BaseRepository<Ticket> {
             date: true,
             time: true,
             venue: true,
-            city: true,
+            cityRef: {
+              select: {
+                id: true,
+                name: true,
+                state: true,
+                country: true,
+              },
+            },
             address: true,
             image: true,
           },

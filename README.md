@@ -1,947 +1,240 @@
 # 🎟️ EventHub API
 
-**A complete, production-ready event management and ticketing platform backend built with NestJS.**
+**A complete, production-ready event management and ticketing platform backend.**
 
 EventHub API is a robust backend service that powers event discovery, ticket booking, and payment processing. It provides a comprehensive solution for event organizers to create and manage events, and for users to discover, book, and purchase tickets seamlessly.
 
-## 🌟 Key Features
+## 🌟 What EventHub Does
 
-- **Event Management** - Create, update, and manage events with multiple ticket types
-- **Smart Booking System** - Redis-based seat holds prevent double bookings (10-minute holds)
-- **Secure Payments** - Stripe integration with webhook support for reliable payment processing
-- **Real-time Updates** - WebSocket notifications for ticket availability and booking changes
-- **Email Notifications** - Automated booking confirmations, tickets, and event reminders
-- **Background Jobs** - Asynchronous email processing and scheduled tasks with BullMQ
-- **QR Code Tickets** - Digital tickets with unique QR codes for validation
-- **Role-Based Access** - Multi-level authentication (User, Organizer, Admin)
-- **User Profile Management** - Update profile, change password, and manage account settings
-- **Ticket Type Management** - Organizers can create, update, and manage ticket types for their events
-- **Admin Dashboard** - Comprehensive admin panel for user management, event oversight, and platform statistics
-- **Dynamic Categories & Cities** - Automatically extracted from events for easy filtering
-- **Image Management** - Cloudinary integration for event images
-- **API Documentation** - Interactive Swagger/OpenAPI documentation
+EventHub is a full-featured platform that connects event organizers with attendees. Organizers can create events, set up ticket types, manage bookings, and track analytics. Attendees can browse events, book tickets, receive digital tickets, and manage their bookings—all in one place.
 
-## 🎯 Use Cases
+### For Event Organizers
+- Create and manage events with multiple ticket types
+- Track bookings and sales in real-time
+- Validate tickets at event entry
+- View detailed analytics and revenue reports
+- Manage event status (draft, active, cancelled)
+- Duplicate events for recurring series
+- Feature events for better visibility
 
-- **Event Organizers** - Host conferences, concerts, workshops, or any ticketed events
-- **Attendees** - Browse events, book tickets, and receive digital tickets instantly
-- **Venue Managers** - Validate tickets at entry with QR code scanning
-- **Administrators** - Manage users, events, and monitor platform activity
+### For Attendees
+- Browse events by category, city, date, and price
+- Book tickets with secure payment processing
+- Receive digital tickets with QR codes via email
+- Manage bookings and view ticket history
+- Get notifications about event updates and cancellations
+- Cancel bookings and receive automatic refunds
 
----
+### For Administrators
+- Manage all users and their roles
+- Oversee all events on the platform
+- View platform-wide statistics and analytics
+- Manage categories and cities
+- Create organizer accounts
+- Monitor platform health and activity
 
-## ✅ What's Included
+## ✨ Key Features
 
-A **production-ready NestJS 10+ backend** with:
-- ✅ PostgreSQL database on Neon.tech
-- ✅ Prisma ORM with complete schema
-- ✅ JWT authentication & authorization
-- ✅ Events CRUD with organizer permissions
-- ✅ Redis seat hold mechanism (Upstash)
-- ✅ Transaction-safe booking system
-- ✅ Ticket management & validation
-- ✅ Email notifications (Resend)
-- ✅ Image upload service (Cloudinary)
-- ✅ Stripe payment integration
-- ✅ Real-time WebSocket updates (Socket.io)
-- ✅ Background jobs with BullMQ
-- ✅ Scheduled tasks (event reminders, analytics)
-- ✅ API documentation with Swagger
-- ✅ Development server with hot reload
-
----
-
-## 🎯 Quick Start (5 Minutes)
-
-```bash
-# 1. Install dependencies
-npm install
-
-# 2. Setup environment variables
-cp .env.example .env
-# Edit .env and add:
-# - DATABASE_URL (Neon PostgreSQL)
-# - REDIS_URL (Upstash Redis)
-# - JWT_SECRET
-# - CLOUDINARY_* credentials
-# - RESEND_API_KEY
-# - STRIPE_SECRET_KEY
-# - STRIPE_WEBHOOK_SECRET
-
-# 3. Setup database
-npm run prisma:generate
-npm run prisma:migrate
-npm run prisma:seed
-
-# 4. Start Redis (required for holds and queues)
-# Make sure Redis is running locally or use Upstash
-
-# 5. Start Stripe webhook listener (in separate terminal)
-stripe listen --forward-to localhost:3001/api/payment/webhook
-
-# 6. Start development server
-npm run start:dev
-```
-
-**Done! API running at http://localhost:3001** 🚀
-
-**WebSocket**: ws://localhost:3001/events  
-**Swagger Docs**: http://localhost:3001/api/docs
-
----
-
-## 📖 Documentation Guide
-
-| File | Use When |
-|------|----------|
-| **QUICK_START.md** | You want to get running ASAP |
-| **SETUP_GUIDE.md** | You need detailed setup instructions |
-| **TESTING_GUIDE.md** | You want to verify everything works |
-| **WEBSOCKET_TESTING.md** | You want to test real-time features |
-| **COMMANDS.md** | You need a command reference |
-| **BACKEND_TECH_STACK.md** | You want to understand the tech stack |
-
----
-
-## 🏗️ Architecture Overview
-
-### Core Technologies
-- **NestJS 10+** - Backend framework
-- **TypeScript 5+** - Type-safe development
-- **Prisma ORM** - Database management
-- **PostgreSQL** - Primary database (Neon.tech)
-- **Redis** - Caching & seat holds (Upstash)
-- **JWT** - Authentication & authorization
-- **Socket.io** - Real-time WebSocket communication
-- **BullMQ** - Background job processing
-- **Stripe** - Payment processing
-- **Cloudinary** - Image storage & optimization
-- **Resend** - Transactional emails
-
-### 🎯 Repository Pattern Architecture
-
-**EventHub uses the Repository Pattern for clean data access layer separation.**
-
-#### Why Repository Pattern?
-- **ORM Independence** - Easy migration from Prisma to other ORMs (Drizzle, TypeORM, etc.)
-- **Better Testability** - Mock repositories for unit tests without database dependencies
-- **Single Responsibility** - Services handle business logic, repositories handle data access
-- **Transaction Support** - Built-in transaction context for multi-step operations
-- **Code Reusability** - Common queries centralized in repositories
-
-#### 10 Repositories Created
-1. **BookingsRepository** - Booking CRUD, holds management, status updates
-2. **TicketTypesRepository** - Ticket type management, availability tracking
-3. **TicketsRepository** - Ticket CRUD, validation, status filters
-4. **EventsRepository** - Event CRUD with search/filter capabilities
-5. **UsersRepository** - User management and authentication queries
-
-Each repository:
-- Extends `BaseRepository` with standard CRUD operations
-- Implements `IBaseRepository` interface
-- Supports transaction context via `WithPrisma<T>` type
-- Provides module-specific query methods
-
-#### Transaction Support
-```typescript
-// Example: Payment flow with transaction
-async handlePaymentSuccess(context: WithPrisma) {
-  const ticketType = await this.ticketTypesRepo.findById(id, context);
-  const booking = await this.bookingsRepo.create(data, context);
-  const tickets = await this.ticketsRepo.createMany(tickets, context);
-  return { booking, tickets };
-}
-```
-
-#### Testing Results
-✅ **14 comprehensive tests passed**:
-- Authentication (login, register, JWT validation)
-- Events (CRUD, search, filters, pagination)
-- Bookings (hold creation, booking flow, pagination)
-- Tickets (filters, get by code, validation)
-- Payment (Stripe intent creation, amount calculation)
-
-**All core functionality verified with repository pattern!**
-
----
-
-_For detailed repository implementation, see [PROJECT_DOCUMENTATION.md](PROJECT_DOCUMENTATION.md)_
-
-### Key Features
-
-#### 1. Authentication & Authorization
-- JWT-based authentication
-- Role-based access control (USER, ORGANIZER, ADMIN)
-- Password hashing with bcrypt
-- Protected routes with guards
-
-#### 2. Event Management
-- CRUD operations for events
-- Organizer-only permissions
-- Image upload to Cloudinary
-- Multiple ticket types per event
-- Event status management
-
-#### 3. Booking System
-- Redis-based seat holds (10 minutes)
-- Transaction-safe booking creation
+### Event Management
+- Create events with rich descriptions, images, and venue details
+- Multiple ticket types per event (General, VIP, Early Bird, etc.)
+- Event status management (Draft, Active, Cancelled, Completed)
+- Featured events for better discoverability
+- Event duplication for recurring series
 - Real-time availability updates
-- QR code generation for tickets
-- Booking cancellation with refunds
 
-#### 4. Payment Processing
-- Stripe payment intents
-- Secure webhook handling
-- Automatic refund processing
-- Payment status tracking
+### Smart Booking System
+- 10-minute seat holds to prevent double bookings
+- Secure payment processing with Stripe
+- Automatic ticket generation with QR codes
+- Email confirmations and ticket delivery
+- Booking cancellation with automatic refunds
+- Real-time booking notifications
 
-#### 5. Real-time Features
-- WebSocket gateway on `/events` namespace
-- Room-based subscriptions
-- Event availability updates
-- Booking notifications
-- JWT authentication for WebSockets
+### User Experience
+- User profiles with customizable information
+- Password management and email verification
+- Booking history and ticket management
+- In-app notifications for important updates
+- Contact form for customer support
+- Public organizer profiles with event statistics
 
-#### 6. Background Jobs
-- Email queue with retry logic (3 attempts)
-- Event reminder emails (daily at 9AM)
-- Analytics processing (hourly)
-- Automatic hold cleanup
+### Organizer Tools
+- Complete event analytics (revenue, bookings, attendance)
+- Ticket validation at event entry
+- Bulk ticket validation for faster check-ins
+- Resend ticket emails to attendees
+- Booking management per event
+- Manual refund processing
 
-#### 7. Email System
-- Booking confirmation emails
-- Ticket delivery with QR codes
-- Cancellation notifications
-- Event reminders
+### Admin Dashboard
+- User management (create, update, delete, activate/deactivate)
+- Event oversight with detailed statistics
+- Platform-wide analytics and insights
+- Category and city management
+- Role management (User, Organizer, Admin)
+- Comprehensive statistics dashboard
 
----
+### Real-Time Features
+- Live ticket availability updates
+- Instant booking notifications
+- Event update broadcasts
+- WebSocket-based real-time communication
 
-## 🗂️ Project Structure
+## 🎯 Who Can Use EventHub
 
-### Configuration Files
+**Event Organizers** - Host conferences, concerts, workshops, or any ticketed events. Manage your events, track sales, and validate tickets at entry.
+
+**Attendees** - Browse events, book tickets, and receive digital tickets instantly. Manage your bookings and get notified about important updates.
+
+**Administrators** - Manage the platform, oversee users and events, and monitor platform activity with comprehensive analytics.
+
+## 🚀 Getting Started
+
+### Quick Setup (5 Minutes)
+
+1. **Install dependencies**
+   ```bash
+   npm install
+   ```
+
+2. **Configure environment**
+   - Copy `.env.example` to `.env`
+   - Add your service credentials (database, Redis, Stripe, etc.)
+
+3. **Setup database**
+   ```bash
+   npm run prisma:generate
+   npm run prisma:migrate
+   ```
+
+4. **Start the server**
+   ```bash
+   npm run start:dev
+   ```
+
+5. **Access the API**
+   - API: http://localhost:3001/api
+   - Documentation: http://localhost:3001/api/docs
+
+That's it! Your EventHub API is running.
+
+## 📚 Documentation
+
+- **API Documentation** - Interactive Swagger docs at `/api/docs`
+- **Frontend Integration Guide** - See `FE_INTEGRATION_PLAN.md` for complete API reference
+- **Technical Documentation** - See `PROJECT_DOCUMENTATION.md` for architecture details
+
+## 🎓 Required Services
+
+EventHub uses several external services that you'll need to set up:
+
+1. **PostgreSQL Database** - We recommend Neon.tech (free tier available)
+2. **Redis** - For seat holds and caching (Upstash recommended, free tier available)
+3. **Stripe** - For payment processing (test mode available)
+4. **Cloudinary** - For image storage (free tier available)
+5. **Resend** - For transactional emails (free tier: 100 emails/day)
+
+Detailed setup instructions are available in the project documentation.
+
+## 🎉 What's Included
+
+A **production-ready backend** with:
+- ✅ Complete authentication system
+- ✅ Event management with multiple ticket types
+- ✅ Smart booking system with seat holds
+- ✅ Secure payment processing
+- ✅ Digital ticket generation with QR codes
+- ✅ Email notifications and confirmations
+- ✅ Real-time updates via WebSocket
+- ✅ Background job processing
+- ✅ Comprehensive admin dashboard
+- ✅ Analytics and reporting
+- ✅ User notifications system
+- ✅ Contact form support
+- ✅ Category and city management
+- ✅ Interactive API documentation
+
+## 📊 Project Status
+
+**All Features Complete!** ✅
+
+All 9 phases of development have been completed:
+- ✅ Phase 1: User Profile & Common Features
+- ✅ Phase 2: Ticket Type Management
+- ✅ Phase 3: Admin Dashboard
+- ✅ Phase 4: Email Verification & Password Reset
+- ✅ Phase 5: Organizer Tools
+- ✅ Phase 6: User Experience (Contact, Notifications, Organizer Profiles)
+- ✅ Phase 7: Analytics & Statistics
+- ✅ Phase 8: Event Utilities (Duplicate, Featured)
+- ✅ Phase 9: Category & City Management
+
+**40 API endpoints implemented and tested** 🎉
+
+## 🧪 Testing
+
+Comprehensive test scripts are available for all features:
+- `test-admin-apis.sh` - Test all admin endpoints
+- `test-organizer-apis.sh` - Test all organizer endpoints
+- `test-user-apis.sh` - Test all user endpoints
+
+Run any test script to verify functionality:
+```bash
+./test-admin-apis.sh
+./test-organizer-apis.sh
+./test-user-apis.sh
 ```
-package.json          # Dependencies and scripts
-tsconfig.json         # TypeScript configuration
-nest-cli.json         # NestJS CLI settings
-.eslintrc.js         # Code linting rules
-.prettierrc          # Code formatting rules
-.env.example         # Environment template
-.gitignore           # Files to ignore in git
-```
 
-### Source Code (`src/`)
-```
-main.ts                    # Application entry point
-app.module.ts              # Root module
-app.controller.ts          # Health check endpoint
-app.service.ts             # Health check logic
-
-auth/                      # Authentication module
-  ├── auth.controller.ts   # Register, login, profile endpoints
-  ├── auth.service.ts      # Auth logic with JWT
-  ├── jwt.strategy.ts      # JWT validation strategy
-  ├── guards/              # Auth guards
-  └── dto/                 # Auth DTOs (register, login, update profile, change password)
-
-events/                    # Events module
-  ├── events.controller.ts # CRUD endpoints + ticket type management
-  ├── events.service.ts    # Business logic
-  ├── events.gateway.ts    # WebSocket gateway
-  └── dto/                 # Data transfer objects
-
-admin/                     # Admin dashboard module
-  ├── admin.controller.ts  # Admin endpoints (users, events, statistics)
-  ├── admin.service.ts     # Admin business logic
-  └── dto/                 # Admin DTOs
-
-common/                    # Common utilities module
-  ├── common.controller.ts # Categories and cities endpoints
-  └── repositories/        # Base repository pattern
-
-bookings/                  # Bookings module
-  ├── bookings.controller.ts # Booking endpoints
-  ├── bookings.service.ts    # Hold & booking logic
-  └── dto/
-
-tickets/                   # Tickets module
-  ├── tickets.controller.ts  # Ticket validation
-  ├── tickets.service.ts     # Ticket management
-  └── dto/
-
-payment/                   # Payment module
-  ├── payment.controller.ts  # Payment & webhook endpoints
-  ├── payment.service.ts     # Stripe integration
-  └── dto/
-
-queues/                    # Background jobs
-  ├── queues.module.ts       # Queue configuration
-  ├── scheduled-jobs.service.ts # Cron jobs
-  └── processors/
-      └── email.processor.ts # Email job processor
-
-email/                     # Email service
-  ├── email.service.ts       # Resend integration
-  └── templates/             # Email templates
-
-upload/                    # File upload
-  ├── upload.controller.ts   # Upload endpoint
-  └── upload.service.ts      # Cloudinary integration
-
-prisma/                    # Database
-  ├── prisma.module.ts       # Prisma module (global)
-  └── prisma.service.ts      # Database connection
-
-redis/                     # Redis cache
-  ├── redis.module.ts        # Redis module (global)
-  └── redis.service.ts       # Redis operations
-```
-
-### Database (`prisma/`)
-```
-schema.prisma        # Complete database schema
-seed.ts             # Test data generator
-migrations/         # Migration history
-```
-
----
-
-## 🛠️ Most Used Commands
+## 🛠️ Common Commands
 
 ```bash
 # Development
-npm run start:dev          # Start dev server with hot reload
-npm run start:debug        # Start with debugger
+npm run start:dev          # Start development server
 npm run build              # Build for production
 npm run start:prod         # Start production server
 
 # Database
-npm run prisma:generate    # Generate Prisma Client
-npm run prisma:migrate     # Create and apply migration
+npm run prisma:generate    # Generate Prisma client
+npm run prisma:migrate     # Run database migrations
 npm run prisma:studio      # Open database GUI
-npm run prisma:seed        # Seed test data
-
-# Background Jobs
-# Jobs run automatically when server starts:
-# - Email queue: Processes booking/cancellation emails
-# - Event reminders: Daily at 9:00 AM
-# - Analytics: Every hour
-# - Hold cleanup: Every 5 minutes
-
-# Stripe (in separate terminal)
-stripe listen --forward-to localhost:3001/api/payment/webhook
 
 # Testing
-curl http://localhost:3001/api        # Test health endpoint
-curl http://localhost:3001/api/docs   # Swagger UI
+./test-admin-apis.sh       # Test admin APIs
+./test-organizer-apis.sh   # Test organizer APIs
+./test-user-apis.sh        # Test user APIs
 ```
-
----
 
 ## 🌐 Important URLs
 
+When running locally:
 - **API Base**: http://localhost:3001/api
-- **Health Check**: http://localhost:3001/api
-- **Swagger Docs**: http://localhost:3001/api/docs
+- **API Documentation**: http://localhost:3001/api/docs
 - **WebSocket**: ws://localhost:3001/events
-- **Prisma Studio**: http://localhost:5555
-- **Neon Dashboard**: https://console.neon.tech
-- **Upstash Dashboard**: https://console.upstash.com
-- **Stripe Dashboard**: https://dashboard.stripe.com/test
-- **Cloudinary Dashboard**: https://cloudinary.com/console
+- **Database GUI**: http://localhost:5555 (via Prisma Studio)
+
+## 💡 Need Help?
+
+- Check the **API Documentation** at `/api/docs` for interactive testing
+- Review **FE_INTEGRATION_PLAN.md** for frontend integration guide
+- See **PROJECT_DOCUMENTATION.md** for technical architecture details
+- Check server logs for detailed error messages
+
+## 🎯 What's Next?
+
+The EventHub backend is **complete and production-ready**. You can now:
+
+1. **Connect your frontend** - Use the integration guide to connect your React/Next.js/Vue app
+2. **Deploy to production** - Deploy to Railway, Vercel, or your preferred hosting
+3. **Customize features** - Add your own customizations and enhancements
+4. **Scale as needed** - The architecture supports horizontal scaling
+
+## 📝 License
+
+This project is open source and available for use in your projects.
 
 ---
 
-## 🗃️ Complete Database Schema
-
-```prisma
-// User Management
-model User {
-  id            String    @id @default(cuid())
-  name          String
-  email         String    @unique
-  password      String
-  role          UserRole  @default(USER)
-  avatar        String?
-  phone         String?
-  companyName   String?
-  emailVerified Boolean   @default(false)
-  isActive      Boolean   @default(true)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  
-  events        Event[]
-  bookings      Booking[]
-  tickets       Ticket[]
-}
-
-// Event Management
-model Event {
-  id          String      @id @default(cuid())
-  title       String
-  description String
-  date        DateTime
-  time        String
-  venue       String
-  address     String
-  city        String
-  image       String?
-  status      EventStatus @default(DRAFT)
-  organizerId String
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
-  
-  organizer   User        @relation(fields: [organizerId], references: [id])
-  ticketTypes TicketType[]
-  bookings    Booking[]
-  tickets     Ticket[]
-}
-
-// Ticket Types
-model TicketType {
-  id          String   @id @default(cuid())
-  eventId     String
-  name        String
-  description String?
-  price       Float
-  quantity    Int
-  available   Int
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
-  event       Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  bookings    Booking[]
-  tickets     Ticket[]
-}
-
-// Bookings
-model Booking {
-  id             String        @id @default(cuid())
-  userId         String
-  eventId        String
-  ticketTypeId   String
-  quantity       Int
-  totalAmount    Float
-  status         BookingStatus @default(PENDING)
-  bookingCode    String        @unique
-  holdId         String?
-  paymentId      String?
-  paymentStatus  PaymentStatus @default(PENDING)
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
-  
-  user           User          @relation(fields: [userId], references: [id])
-  event          Event         @relation(fields: [eventId], references: [id])
-  ticketType     TicketType    @relation(fields: [ticketTypeId], references: [id])
-  tickets        Ticket[]
-}
-
-// Tickets
-model Ticket {
-  id           String       @id @default(cuid())
-  bookingId    String
-  userId       String
-  eventId      String
-  ticketTypeId String
-  ticketCode   String       @unique
-  qrCodeData   String
-  seatNumber   String?
-  status       TicketStatus @default(VALID)
-  usedAt       DateTime?
-  createdAt    DateTime     @default(now())
-  updatedAt    DateTime     @updatedAt
-  
-  booking      Booking      @relation(fields: [bookingId], references: [id])
-  user         User         @relation(fields: [userId], references: [id])
-  event        Event        @relation(fields: [eventId], references: [id])
-  ticketType   TicketType   @relation(fields: [ticketTypeId], references: [id])
-}
-
-// Enums
-enum UserRole {
-  USER
-  ORGANIZER
-  ADMIN
-}
-
-enum EventStatus {
-  DRAFT
-  ACTIVE
-  CANCELLED
-  COMPLETED
-}
-
-enum BookingStatus {
-  PENDING
-  CONFIRMED
-  CANCELLED
-  COMPLETED
-}
-
-enum TicketStatus {
-  VALID
-  USED
-  CANCELLED
-  EXPIRED
-}
-
-enum PaymentStatus {
-  PENDING
-  PAID
-  FAILED
-  REFUNDED
-}
-```
-
----
-
-## 🚀 API Endpoints
-
-### Authentication
-- `POST /api/auth/register` - Register new user
-- `POST /api/auth/login` - Login with credentials
-- `GET /api/auth/me` - Get current user profile (protected)
-- `PATCH /api/auth/profile` - Update user profile (name, phone, avatar)
-- `PATCH /api/auth/password` - Change user password
-
-### Events
-- `GET /api/events` - List all active events (public)
-  - Query params: `?organizerId={id}` - Filter by organizer (get organizer's events)
-  - Query params: `?minPrice={number}&maxPrice={number}` - Filter by price range
-  - Query params: `?search={text}&city={name}&category={type}&status={status}&featured={boolean}`
-  - Query params: `?city={city}&status={status}&search={keyword}` - Other filters
-- `GET /api/events/:id` - Get event details (public)
-- `POST /api/events` - Create event (organizer only)
-- `PATCH /api/events/:id` - Update event (organizer only)
-- `DELETE /api/events/:id` - Delete event (organizer only)
-
-### Ticket Types (Organizer)
-- `POST /api/events/:eventId/ticket-types` - Create ticket type for event
-- `GET /api/events/:eventId/ticket-types` - Get all ticket types for event
-- `PATCH /api/events/:eventId/ticket-types/:id` - Update ticket type
-- `DELETE /api/events/:eventId/ticket-types/:id` - Delete ticket type
-
-### Bookings & Holds
-- `POST /api/bookings/hold` - Create seat hold (10 min)
-- `GET /api/bookings/hold/:holdId` - Get hold details
-- `DELETE /api/bookings/hold/:holdId` - Release hold
-- `POST /api/bookings` - Create booking from hold
-- `GET /api/bookings` - Get user's bookings
-- `GET /api/bookings/:id` - Get booking details
-- `DELETE /api/bookings/:id` - Cancel booking
-
-### Tickets
-- `GET /api/tickets` - Get user's tickets
-- `GET /api/tickets/:id` - Get ticket details
-- `POST /api/tickets/:ticketCode/validate` - Validate ticket by code (organizer)
-
-### Payment
-- `POST /api/payment/create-intent` - Create Stripe payment intent
-- `POST /api/payment/webhook` - Stripe webhook (automated)
-
-### Common
-- `GET /api/categories` - Get all event categories with counts
-- `GET /api/cities` - Get all cities with event counts
-
-### Upload
-- `POST /api/upload/event-image` - Upload event image to Cloudinary
-
-### Admin (Admin Only)
-- `GET /api/admin/users` - Get all users with pagination and filters
-- `GET /api/admin/users/:id` - Get user details with related data
-- `POST /api/admin/users/create-organizer` - Create organizer account
-- `PATCH /api/admin/users/:id/role` - Update user role
-- `PATCH /api/admin/users/:id/status` - Activate/deactivate user
-- `DELETE /api/admin/users/:id` - Delete user
-- `GET /api/admin/events` - Get all events (admin view with statistics)
-- `GET /api/admin/statistics` - Get platform statistics
-
-### WebSocket Events
-- `ticket:availability` - Real-time ticket availability
-- `booking:created` - New booking notification
-- `booking:updated` - Booking status change
-- `booking:cancelled` - Booking cancellation
-- `event:updated` - Event details change
-- `event:cancelled` - Event cancellation
-
----
-
-Run through this checklist to verify Phase 1:
-
-```bash
-# 1. Install works
-npm install
-
-# 2. Server starts
-npm run start:dev
-# Should see: "EventHub API is running on: http://localhost:3001"
-
-# 3. Health check works
-curl http://localhost:3001/api
-# Should return: {"status": "success", ...}
-
-# 4. Database GUI works
-npm run prisma:studio
-# Should open browser at localhost:5555
-
-# 5. API docs work
-open http://localhost:3001/api/docs
-# Should see Swagger UI
-```
-
-**All ✅? Phase 1 is complete!**
-
----
-
-## 🎓 Required Services Setup
-
-### 1. Neon Database (PostgreSQL)
-- Go to [neon.tech](https://neon.tech)
-- Sign up (free, no credit card)
-- Create project named `eventhub`
-- Copy connection string (pooled)
-- Add to `.env` as `DATABASE_URL`
-
-### 2. Upstash Redis
-- Go to [upstash.com](https://upstash.com)
-- Sign up (free tier available)
-- Create Redis database
-- Copy REST URL
-- Add to `.env` as `REDIS_URL`
-
-### 3. Stripe
-- Go to [stripe.com](https://stripe.com)
-- Sign up and get test API keys
-- Copy Secret Key
-- Add to `.env` as `STRIPE_SECRET_KEY`
-- Install Stripe CLI for webhook testing
-- Run: `stripe listen --forward-to localhost:3001/api/payment/webhook`
-- Copy webhook secret to `.env` as `STRIPE_WEBHOOK_SECRET`
-
-### 4. Cloudinary
-- Go to [cloudinary.com](https://cloudinary.com)
-- Sign up (free tier available)
-- Get Cloud Name, API Key, API Secret
-- Add to `.env`:
-  - `CLOUDINARY_CLOUD_NAME`
-  - `CLOUDINARY_API_KEY`
-  - `CLOUDINARY_API_SECRET`
-
-### 5. Resend (Email)
-- Go to [resend.com](https://resend.com)
-- Sign up (free tier: 100 emails/day)
-- Get API Key
-- Add to `.env` as `RESEND_API_KEY`
-
-### 6. JWT Secret
-- Generate random string:
-  ```bash
-  node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
-  ```
-- Add to `.env` as `JWT_SECRET`
-
----
-
-## 🔥 What Can You Do Now?
-
-### 1. Test Complete Booking Flow
-```bash
-# Register user
-curl -X POST http://localhost:3001/api/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{"name":"Test User","email":"test@example.com","password":"password123"}'
-
-# Login to get token
-curl -X POST http://localhost:3001/api/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"email":"test@example.com","password":"password123"}'
-
-# Create hold
-curl -X POST http://localhost:3001/api/bookings/hold \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer YOUR_TOKEN" \
-  -d '{"eventId":"EVENT_ID","ticketTypeId":"TICKET_TYPE_ID","quantity":1}'
-
-# Create payment intent
-curl -X POST http://localhost:3001/api/payment/create-intent \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer YOUR_TOKEN" \
-  -d '{"holdId":"HOLD_ID"}'
-
-# Confirm payment (via Stripe CLI)
-stripe payment_intents confirm PAYMENT_INTENT_ID \
-  --payment-method=pm_card_visa \
-  --return-url=http://localhost:3000/success
-```
-
-### 2. Test Real-time Features
-- Open `websocket-test.html` in browser
-- Connect to WebSocket
-- Subscribe to an event
-- Create/cancel bookings and see live updates
-
-### 3. Monitor Background Jobs
-```bash
-# Check server logs for:
-# - [EmailProcessor] Processing job...
-# - [ScheduledJobsService] Event reminder job...
-# - [ScheduledJobsService] Analytics processing...
-```
-
-### 4. View Database
-```bash
-npm run prisma:studio
-# Browse users, events, bookings, tickets
-```
-
-### 5. Test API with Swagger
-```bash
-open http://localhost:3001/api/docs
-# Interactive API testing interface
-```
-
----
-
-## 🚀 Next Phase: Future Enhancements
-
-**The core EventHub backend is complete!** All 12 phases are implemented and tested.
-
-### Possible Future Enhancements:
-- Admin dashboard & analytics
-- User profile management
-- Event reviews and ratings
-- Favorites/Wishlist
-- Multi-language support
-- Social media integration
-- Push notifications
-- Advanced search filters
-- Event recommendations
-- Deployment to Railway/Vercel
-
----
-
-## 🐛 Common Issues & Solutions
-
-### "Cannot connect to database"
-```bash
-# Check your .env
-cat .env | grep DATABASE_URL
-
-# Test connection
-npx prisma db pull
-
-# Regenerate client
-npm run prisma:generate
-```
-
-### "Redis connection failed"
-```bash
-# If using local Redis
-redis-cli ping  # Should return PONG
-
-# If using Upstash, check REDIS_URL in .env
-```
-
-### "Port 3001 already in use"
-```bash
-# Kill the process
-lsof -ti:3001 | xargs kill -9
-```
-
-### "Stripe webhook not working"
-```bash
-# Make sure Stripe CLI is running
-stripe listen --forward-to localhost:3001/api/payment/webhook
-
-# Check webhook secret matches .env
-```
-
-### "Module not found"
-```bash
-# Reinstall dependencies
-rm -rf node_modules package-lock.json
-npm install
-```
-
-### "WebSocket connection failed"
-```bash
-# Check server is running
-curl http://localhost:3001/api
-
-# Try without JWT first (anonymous connection)
-# Then add valid JWT token
-```
-
-### "Background jobs not running"
-```bash
-# Check Redis is connected
-# Check server logs for:
-# - [QueuesModule] Dependency @nestjs/bull...
-# - [ScheduledJobsService] initialized
-```
-
-### "Emails not sending"
-```bash
-# Check RESEND_API_KEY in .env
-# Check server logs for EmailProcessor errors
-# Verify email queue is processing (check logs)
-```
-
----
-
-## 📊 Implementation Status
-
-| Phase | Feature | Status | Date |
-|-------|---------|--------|------|
-| Core Setup | Project Setup & Database | ✅ Complete | Nov 3, 2025 |
-| Core Setup | Authentication (Register/Login) | ✅ Complete | Nov 22, 2025 |
-| Core Setup | Events CRUD | ✅ Complete | Nov 22, 2025 |
-| Core Setup | Redis + Seat Holds | ✅ Complete | Nov 22, 2025 |
-| Core Setup | Booking System | ✅ Complete | Nov 22, 2025 |
-| Core Setup | Ticket Management | ✅ Complete | Nov 22, 2025 |
-| Core Setup | Email Notifications | ✅ Complete | Nov 22, 2025 |
-| Core Setup | File Upload (Cloudinary) | ✅ Complete | Nov 22, 2025 |
-| Core Setup | Stripe Payment Integration | ✅ Complete | Dec 6, 2025 |
-| Core Setup | Real-time Features (Socket.io) | ✅ Complete | Dec 6, 2025 |
-| Core Setup | Background Jobs (BullMQ) | ✅ Complete | Dec 6, 2025 |
-| **Phase 1** | **User Profile & Common Features** | ✅ **Complete** | **Dec 28, 2025** |
-| **Phase 2** | **Ticket Type Management** | ✅ **Complete** | **Dec 28, 2025** |
-| **Phase 3** | **Admin Dashboard** | ✅ **Complete** | **Dec 28, 2025** |
-
-**Current Status: Phase 3 Complete ✅**  
-**17/40 API endpoints implemented (42.5%)** 🎉
-
----
-
-## 💡 Quick Tips
-
-1. **Always check server logs** - Most errors show detailed info in console
-2. **Use Prisma Studio** - Visual database browser, easy data editing
-3. **Test with Swagger** - Interactive API docs at `/api/docs`
-4. **Monitor WebSocket** - Use websocket-test.html for real-time testing
-5. **Check Redis** - Use `redis-cli` or Upstash dashboard to monitor holds
-6. **Stripe Test Mode** - Use test cards (4242 4242 4242 4242)
-7. **Background Jobs** - Check server logs for queue processing
-8. **Email Testing** - Check Resend dashboard for sent emails
-9. **Git Commits** - Review commit history for implementation details
-10. **Environment Variables** - Use .env.example as reference
-
----
-
-## 🚀 Next Steps
-
-### For Development
-- Email verification system
-- Password reset functionality
-- Organizer analytics dashboard
-- Event reviews and ratings
-- Favorites/Wishlist feature
-- Advanced search filters
-- Event recommendations
-
-### For Production
-- Set up CI/CD pipeline
-- Configure production environment
-- Set up monitoring (Sentry, DataDog)
-- Configure backup strategy
-- Set up SSL certificates
-- Configure rate limiting
-- Add security headers
-- Set up logging service
-
-### Testing
-- Add unit tests (Jest)
-- Add e2e tests (Supertest)
-- Add WebSocket tests
-- Add payment flow tests
-- Load testing with Artillery
-- Security testing
-
----
-
-## 📚 Learn More
-
-### Official Documentation
-- **NestJS**: https://docs.nestjs.com
-- **Prisma**: https://www.prisma.io/docs
-- **PostgreSQL**: https://www.postgresql.org/docs
-- **Redis**: https://redis.io/docs
-- **Socket.io**: https://socket.io/docs
-- **BullMQ**: https://docs.bullmq.io
-- **Stripe**: https://stripe.com/docs/api
-- **TypeScript**: https://www.typescriptlang.org/docs
-
-### Service Dashboards
-- **Neon**: https://console.neon.tech
-- **Upstash**: https://console.upstash.com
-- **Stripe**: https://dashboard.stripe.com
-- **Cloudinary**: https://cloudinary.com/console
-- **Resend**: https://resend.com/emails
-
----
-
-## 🎉 You're All Set!
-
-Your EventHub backend is:
-- ✅ Fully configured and production-ready
-- ✅ Connected to all required services
-- ✅ Running with real-time features
-- ✅ Processing payments with Stripe
-- ✅ Sending emails asynchronously
-- ✅ Running background jobs
-- ✅ Ready for frontend integration
-
-**Core features complete + Phase 1, 2, and 3 implemented!** 🚀
-
----
-
-**Need Help?**
-- Check SETUP_GUIDE.md for detailed setup
-- Read TESTING_GUIDE.md for verification
-- Use WEBSOCKET_TESTING.md for real-time features
-- Review COMMANDS.md for quick reference
-
----
-
-**Environment Variables Required:**
-```env
-# Database
-DATABASE_URL=               # Neon PostgreSQL
-
-# Redis
-REDIS_URL=                  # Upstash Redis
-REDIS_HOST=localhost        # For local Redis (optional)
-REDIS_PORT=6379            # For local Redis (optional)
-
-# Authentication
-JWT_SECRET=                 # Random 32+ character string
-
-# Email
-RESEND_API_KEY=            # Resend API key
-
-# Payment
-STRIPE_SECRET_KEY=         # Stripe test secret key
-STRIPE_WEBHOOK_SECRET=     # From Stripe CLI
-
-# Upload
-CLOUDINARY_CLOUD_NAME=     # Cloudinary cloud name
-CLOUDINARY_API_KEY=        # Cloudinary API key
-CLOUDINARY_API_SECRET=     # Cloudinary API secret
-```
-
----
-
-Built with ❤️ using:
-- **NestJS 10+** - Progressive Node.js framework
-- **Prisma ORM** - Next-generation database toolkit
-- **PostgreSQL** - Reliable relational database (Neon.tech)
-- **Redis** - In-memory data store (Upstash)
-- **Socket.io** - Real-time bidirectional communication
-- **BullMQ** - Premium queue package for Node.js
-- **Stripe** - Payment processing platform
-- **Cloudinary** - Image and video management
-- **Resend** - Modern email for developers
-- **TypeScript 5+** - JavaScript with syntax for types
+**Built with ❤️ for event organizers and attendees everywhere.**
 
 **Star this repo if it helped you!** ⭐
-
----

@@ -9,9 +9,10 @@ import { UsersRepository } from '../auth/users.repository';
 import { PaymentModule } from '../payment/payment.module';
 import { EventsModule } from '../events/events.module';
 import { QueuesModule } from '../queues/queues.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
-  imports: [PaymentModule, forwardRef(() => EventsModule), QueuesModule],
+  imports: [PaymentModule, forwardRef(() => EventsModule), QueuesModule, NotificationsModule],
   controllers: [BookingsController],
   providers: [
     BookingsService,

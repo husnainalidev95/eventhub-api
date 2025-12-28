@@ -65,7 +65,12 @@ export class BookingResponseDto {
     date: Date;
     time: string;
     venue: string;
-    city: string;
+    cityRef?: {
+      id: string;
+      name: string;
+      state: string | null;
+      country: string;
+    };
   };
 
   @ApiProperty({

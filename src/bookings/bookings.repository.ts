@@ -30,7 +30,14 @@ export class BookingsRepository extends BaseRepository<Booking> {
             date: true,
             time: true,
             venue: true,
-            city: true,
+            cityRef: {
+              select: {
+                id: true,
+                name: true,
+                state: true,
+                country: true,
+              },
+            },
           },
         },
         ticketType: {
@@ -88,7 +95,14 @@ export class BookingsRepository extends BaseRepository<Booking> {
             date: true,
             time: true,
             venue: true,
-            city: true,
+            cityRef: {
+              select: {
+                id: true,
+                name: true,
+                state: true,
+                country: true,
+              },
+            },
             image: true,
           },
         },
@@ -150,7 +164,14 @@ export class BookingsRepository extends BaseRepository<Booking> {
             date: true,
             time: true,
             venue: true,
-            city: true,
+            cityRef: {
+              select: {
+                id: true,
+                name: true,
+                state: true,
+                country: true,
+              },
+            },
           },
         },
         ticketType: {
@@ -211,7 +232,14 @@ export class BookingsRepository extends BaseRepository<Booking> {
             date: true,
             time: true,
             venue: true,
-            city: true,
+            cityRef: {
+              select: {
+                id: true,
+                name: true,
+                state: true,
+                country: true,
+              },
+            },
           },
         },
         ticketType: {

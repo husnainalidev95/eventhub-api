@@ -29,19 +29,19 @@ export class GetEventsQueryDto {
 
   @ApiProperty({
     required: false,
-    description: 'Filter by category',
+    description: 'Filter by category ID',
   })
   @IsOptional()
   @IsString()
-  category?: string;
+  categoryId?: string;
 
   @ApiProperty({
     required: false,
-    description: 'Filter by city',
+    description: 'Filter by city ID',
   })
   @IsOptional()
   @IsString()
-  city?: string;
+  cityId?: string;
 
   @ApiProperty({
     required: false,

@@ -4,4 +4,10 @@ export * from './update-user-role.dto';
 export * from './update-user-status.dto';
 export * from './get-admin-events-query.dto';
 export * from './get-statistics-query.dto';
+export * from './create-category.dto';
+export * from './update-category.dto';
+export * from './get-categories-query.dto';
+export * from './create-city.dto';
+export * from './update-city.dto';
+export * from './get-cities-query.dto';
 

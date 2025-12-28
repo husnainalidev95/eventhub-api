@@ -1,4 +1,4 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   IsString,
   IsDateString,
@@ -29,10 +29,13 @@ export class UpdateEventDto {
   @IsString()
   description?: string;
 
-  @ApiProperty({ example: 'Music', description: 'Event category', required: false })
+  @ApiPropertyOptional({
+    example: 'clx0z9m00000008ju00000000',
+    description: 'Category ID',
+  })
   @IsOptional()
   @IsString()
-  category?: string;
+  categoryId?: string;
 
   @ApiProperty({
     example:
@@ -61,10 +64,13 @@ export class UpdateEventDto {
   @IsString()
   time?: string;
 
-  @ApiProperty({ example: 'New York', description: 'City', required: false })
+  @ApiPropertyOptional({
+    example: 'clx0z9m00000008ju00000001',
+    description: 'City ID',
+  })
   @IsOptional()
   @IsString()
-  city?: string;
+  cityId?: string;
 
   @ApiProperty({
     example: 'Madison Square Garden',

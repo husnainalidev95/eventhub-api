@@ -53,7 +53,7 @@ model User {
   emailVerified Boolean  @default(false)
   companyName   String?
   description   String?  @db.Text // Organizer description/bio
-  website       String?   // Organizer website URL
+  website       String? // Organizer website URL
 
   // Relations
   events        Event[]
@@ -69,11 +69,11 @@ model Event {
   id            String      @id @default(cuid())
   title         String
   description   String      @db.Text
-  category      String
+  categoryId    String      // Required foreign key to Category
   image         String?
   date          DateTime
   time          String
-  city          String
+  cityId        String      // Required foreign key to City
   venue         String
   address       String
   organizerId   String
@@ -86,6 +86,8 @@ model Event {
 
   // Relations
   organizer   User         @relation(fields: [organizerId], references: [id], onDelete: Cascade)
+  categoryRef Category     @relation("Category", fields: [categoryId], references: [id], onDelete: Restrict)
+  cityRef     City         @relation("City", fields: [cityId], references: [id], onDelete: Restrict)
   ticketTypes TicketType[]
   bookings    Booking[]
   tickets     Ticket[]
@@ -122,9 +124,9 @@ model Booking {
   quantity      Int
   totalAmount   Float
   status        BookingStatus @default(PENDING)
-  holdId        String?       // Reference to Redis hold ID
-  paymentId     String?       // Stripe payment ID (future)
-  paymentStatus String?       // Payment status (future)
+  holdId        String? // Reference to Redis hold ID
+  paymentId     String? // Stripe payment ID (future)
+  paymentStatus String? // Payment status (future)
   bookingCode   String        @unique // Unique booking reference
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
@@ -146,10 +148,10 @@ model Ticket {
   eventId      String
   ticketTypeId String
   ticketCode   String       @unique // Unique ticket identifier (TIX-XXXX-XXXX)
-  qrCodeData   String       // QR code data for validation
-  seatNumber   String?      // Optional seat assignment
+  qrCodeData   String // QR code data for validation
+  seatNumber   String? // Optional seat assignment
   status       TicketStatus @default(VALID)
-  usedAt       DateTime?    // When ticket was validated/used
+  usedAt       DateTime? // When ticket was validated/used
   createdAt    DateTime     @default(now())
   updatedAt    DateTime     @updatedAt
 
@@ -166,10 +168,10 @@ model Ticket {
 model Notification {
   id        String   @id @default(cuid())
   userId    String
-  type      String   // e.g., 'BOOKING_CONFIRMED', 'EVENT_CANCELLED', 'TICKET_READY', etc.
+  type      String // e.g., 'BOOKING_CONFIRMED', 'EVENT_CANCELLED', 'TICKET_READY', etc.
   title     String
   message   String   @db.Text
-  data      Json?    // Additional data as JSON
+  data      Json? // Additional data as JSON
   isRead    Boolean  @default(false)
   createdAt DateTime @default(now())
 
@@ -179,4 +181,36 @@ model Notification {
   @@index([userId, isRead])
   @@index([userId, createdAt])
   @@map("notifications")
+}
+
+// Category Model
+model Category {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  slug        String   @unique
+  icon        String? // Icon URL or identifier
+  description String?  @db.Text
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  events Event[] @relation("Category")
+
+  @@map("categories")
+}
+
+// City Model
+model City {
+  id        String   @id @default(cuid())
+  name      String
+  state     String?
+  country   String   @default("USA")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  events Event[] @relation("City")
+
+  @@unique([name, state, country])
+  @@map("cities")
 }
