@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  ForbiddenException,
   Inject,
   forwardRef,
 } from '@nestjs/common';
@@ -432,5 +433,162 @@ export class BookingsService {
       ticketCode,
       timestamp: Date.now(),
     });
+  }
+
+  // Organizer Booking Management Methods
+
+  async getEventBookings(
+    eventId: string,
+    userId: string,
+    userRole: string,
+    status?: string,
+    page: number = 1,
+    limit: number = 10,
+  ) {
+    // Verify event exists and user has permission
+    const event = await this.eventsRepository.findById(eventId);
+
+    if (!event) {
+      throw new NotFoundException('Event not found');
+    }
+
+    // Check if user is organizer or admin
+    if (event.organizerId !== userId && userRole !== 'ADMIN') {
+      throw new ForbiddenException('You do not have permission to view bookings for this event');
+    }
+
+    const skip = (page - 1) * limit;
+
+    const filter: any = { eventId };
+    if (status) {
+      filter.status = status;
+    }
+
+    const [bookings, total] = await Promise.all([
+      this.bookingsRepository.findAll({
+        ...filter,
+        skip,
+        take: limit,
+      }),
+      this.bookingsRepository.count(filter),
+    ]);
+
+    // Get user details for each booking
+    const bookingsWithUsers = await Promise.all(
+      bookings.map(async (booking) => {
+        const user = await this.usersRepository.findById(booking.userId);
+        return {
+          ...booking,
+          user: user
+            ? {
+                id: user.id,
+                email: user.email,
+                name: user.name,
+              }
+            : null,
+        };
+      }),
+    );
+
+    return {
+      data: bookingsWithUsers,
+      meta: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+  }
+
+  async updateBookingStatus(
+    bookingId: string,
+    userId: string,
+    userRole: string,
+    newStatus: string,
+  ) {
+    // Get booking with event
+    const booking = await this.bookingsRepository.findById(bookingId);
+
+    if (!booking) {
+      throw new NotFoundException('Booking not found');
+    }
+
+    // Verify event ownership or admin
+    const event = await this.eventsRepository.findById(booking.eventId);
+    if (event.organizerId !== userId && userRole !== 'ADMIN') {
+      throw new ForbiddenException('You do not have permission to update this booking');
+    }
+
+    // Validate status transition
+    if (booking.status === 'CANCELLED' && newStatus !== 'CANCELLED') {
+      throw new BadRequestException('Cannot change status of a cancelled booking');
+    }
+
+    if (booking.status === 'COMPLETED' && newStatus !== 'COMPLETED') {
+      throw new BadRequestException('Cannot change status of a completed booking');
+    }
+
+    // Update booking status
+    const updatedBooking = await this.bookingsRepository.update(bookingId, {
+      status: newStatus as any,
+    });
+
+    // Emit WebSocket event
+    this.eventsGateway.emitBookingUpdated(booking.userId, updatedBooking);
+
+    return updatedBooking;
+  }
+
+  async refundBooking(bookingId: string, userId: string, userRole: string) {
+    // Get booking with event
+    const booking = await this.bookingsRepository.findById(bookingId);
+
+    if (!booking) {
+      throw new NotFoundException('Booking not found');
+    }
+
+    // Verify event ownership or admin
+    const event = await this.eventsRepository.findById(booking.eventId);
+    if (event.organizerId !== userId && userRole !== 'ADMIN') {
+      throw new ForbiddenException('You do not have permission to refund this booking');
+    }
+
+    // Check if booking has payment
+    if (!booking.paymentId) {
+      throw new BadRequestException('Booking does not have a payment to refund');
+    }
+
+    const paymentStatus = booking.paymentStatus as string | null | undefined;
+    
+    // Check if already refunded
+    if (paymentStatus === 'REFUNDED') {
+      throw new BadRequestException('Booking has already been refunded');
+    }
+
+    // Check if payment is paid
+    if (paymentStatus !== 'PAID') {
+      throw new BadRequestException('Booking does not have a paid payment to refund');
+    }
+
+    try {
+      // Process refund
+      await this.paymentService.createRefund(booking.paymentId);
+
+      // Update booking payment status
+      const updatedBooking = await this.bookingsRepository.update(bookingId, {
+        paymentStatus: 'REFUNDED',
+      });
+
+      // Emit WebSocket event
+      this.eventsGateway.emitBookingUpdated(booking.userId, updatedBooking);
+
+      return {
+        message: 'Refund processed successfully',
+        booking: updatedBooking,
+      };
+    } catch (error) {
+      throw new BadRequestException(`Failed to process refund: ${error.message}`);
+    }
   }
 }

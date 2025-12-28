@@ -3,6 +3,7 @@ import {
   Post,
   Get,
   Delete,
+  Patch,
   Body,
   Param,
   UseGuards,
@@ -15,7 +16,11 @@ import { CreateHoldDto } from './dto/create-hold.dto';
 import { HoldResponseDto } from './dto/hold-response.dto';
 import { CreateBookingDto } from './dto/create-booking.dto';
 import { BookingResponseDto } from './dto/booking-response.dto';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { GetEventBookingsQueryDto } from './dto/get-event-bookings-query.dto';
+import { UpdateBookingStatusDto } from './dto/update-booking-status.dto';
+import { JwtAuthGuard, RolesGuard } from '../auth/guards';
+import { Roles } from '../auth/decorators';
+import { UserRole } from '@prisma/client';
 
 @ApiTags('Bookings')
 @Controller('bookings')
@@ -227,5 +232,127 @@ export class BookingsController {
   })
   async cancelBooking(@Request() req, @Param('id') id: string): Promise<{ message: string }> {
     return this.bookingsService.cancelBooking(id, req.user.id);
+  }
+
+  // Organizer Booking Management Endpoints
+
+  @Get('event/:eventId')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ORGANIZER, UserRole.ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Get bookings for an event (Organizer or Admin only)',
+    description: 'Retrieve all bookings for a specific event with pagination and filters',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Bookings retrieved successfully',
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized - JWT token required',
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - Not event organizer or admin',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Event not found',
+  })
+  async getEventBookings(
+    @Param('eventId') eventId: string,
+    @Request() req,
+    @Query() query: GetEventBookingsQueryDto,
+  ) {
+    return this.bookingsService.getEventBookings(
+      eventId,
+      req.user.id,
+      req.user.role,
+      query.status,
+      query.page,
+      query.limit,
+    );
+  }
+
+  @Patch(':id/status')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ORGANIZER, UserRole.ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Update booking status (Organizer or Admin only)',
+    description: 'Update the status of a booking for an event',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Booking status updated successfully',
+    type: BookingResponseDto,
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Bad Request - Invalid status transition',
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized - JWT token required',
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - Not event organizer or admin',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Booking not found',
+  })
+  async updateBookingStatus(
+    @Param('id') id: string,
+    @Request() req,
+    @Body() updateStatusDto: UpdateBookingStatusDto,
+  ) {
+    return this.bookingsService.updateBookingStatus(
+      id,
+      req.user.id,
+      req.user.role,
+      updateStatusDto.status,
+    );
+  }
+
+  @Post(':id/refund')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ORGANIZER, UserRole.ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Manually trigger refund for booking (Organizer or Admin only)',
+    description: 'Process a refund for a paid booking',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Refund processed successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        message: { type: 'string' },
+        booking: { type: 'object' },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Bad Request - No payment to refund or already refunded',
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized - JWT token required',
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - Not event organizer or admin',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Booking not found',
+  })
+  async refundBooking(@Param('id') id: string, @Request() req) {
+    return this.bookingsService.refundBooking(id, req.user.id, req.user.role);
   }
 }

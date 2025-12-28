@@ -216,4 +216,69 @@ export class EventsController {
   ) {
     return this.eventsService.deleteTicketType(eventId, ticketTypeId, user.id, user.role);
   }
+
+  // Event Status Management Endpoints
+
+  @Patch(':id/publish')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Publish event (DRAFT → ACTIVE) - Organizer or Admin only' })
+  @ApiResponse({
+    status: 200,
+    description: 'Event published successfully',
+    type: EventResponseDto,
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Bad Request - Event must have ticket types or already published',
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden - Not event owner or admin' })
+  @ApiResponse({ status: 404, description: 'Event not found' })
+  async publishEvent(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
+    return this.eventsService.publishEvent(id, user.id, user.role);
+  }
+
+  @Patch(':id/unpublish')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Unpublish event (ACTIVE → DRAFT) - Organizer or Admin only' })
+  @ApiResponse({
+    status: 200,
+    description: 'Event unpublished successfully',
+    type: EventResponseDto,
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Bad Request - Event already unpublished or cannot unpublish',
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden - Not event owner or admin' })
+  @ApiResponse({ status: 404, description: 'Event not found' })
+  async unpublishEvent(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
+    return this.eventsService.unpublishEvent(id, user.id, user.role);
+  }
+
+  @Patch(':id/cancel')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Cancel event - Organizer or Admin only' })
+  @ApiResponse({
+    status: 200,
+    description: 'Event cancelled successfully with refunds processed',
+    schema: {
+      properties: {
+        id: { type: 'string' },
+        status: { type: 'string', example: 'CANCELLED' },
+        cancelledBookings: { type: 'number' },
+      },
+    },
+  })
+  @ApiResponse({ status: 400, description: 'Bad Request - Event already cancelled or completed' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden - Not event owner or admin' })
+  @ApiResponse({ status: 404, description: 'Event not found' })
+  async cancelEvent(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
+    return this.eventsService.cancelEvent(id, user.id, user.role);
+  }
 }

@@ -4,6 +4,8 @@ import {
   ForbiddenException,
   BadRequestException,
   Logger,
+  Inject,
+  forwardRef,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { UploadService } from '../upload/upload.service';
@@ -18,6 +20,12 @@ import { UserRole } from '@prisma/client';
 import { DEFAULT_EVENT_IMAGE } from '../common/constants';
 import { EventsRepository } from './events.repository';
 import { TicketTypesRepository } from '../bookings/ticket-types.repository';
+import { EventsGateway } from './events.gateway';
+import { BookingsRepository } from '../bookings/bookings.repository';
+import { PaymentService } from '../payment/payment.service';
+import { InjectQueue } from '@nestjs/bull';
+import { Queue } from 'bullmq';
+import { CancellationEmailJob } from '../queues/processors/email.processor';
 
 @Injectable()
 export class EventsService {
@@ -28,6 +36,12 @@ export class EventsService {
     private eventsRepository: EventsRepository,
     private ticketTypesRepository: TicketTypesRepository,
     private uploadService: UploadService,
+    @Inject(forwardRef(() => EventsGateway))
+    private eventsGateway: EventsGateway,
+    private bookingsRepository: BookingsRepository,
+    @Inject(forwardRef(() => PaymentService))
+    private paymentService: PaymentService,
+    @InjectQueue('email') private emailQueue: Queue,
   ) {}
 
   async create(userId: string, userName: string, createEventDto: CreateEventDto) {
@@ -335,6 +349,194 @@ export class EventsService {
     return {
       message: 'Ticket type deleted successfully',
       id: ticketTypeId,
+    };
+  }
+
+  // Event Status Management Methods
+
+  async publishEvent(id: string, userId: string, userRole: UserRole) {
+    const event = await this.eventsRepository.findById(id);
+
+    if (!event) {
+      throw new NotFoundException(`Event with ID ${id} not found`);
+    }
+
+    // Check if user is owner or admin
+    if (event.organizerId !== userId && userRole !== UserRole.ADMIN) {
+      throw new ForbiddenException('You do not have permission to publish this event');
+    }
+
+    // Validate: must have at least one ticket type
+    const ticketTypes = await this.ticketTypesRepository.findAll({ eventId: id });
+    if (ticketTypes.length === 0) {
+      throw new BadRequestException('Event must have at least one ticket type before publishing');
+    }
+
+    // Check if event is already published
+    if (event.status === 'ACTIVE') {
+      throw new BadRequestException('Event is already published');
+    }
+
+    // Check if event is cancelled or completed
+    if (event.status === 'CANCELLED' || event.status === 'COMPLETED') {
+      throw new BadRequestException(`Cannot publish event with status: ${event.status}`);
+    }
+
+    // Update status to ACTIVE
+    const updatedEvent = await this.eventsRepository.update(id, {
+      status: 'ACTIVE',
+    });
+
+    // Emit WebSocket event
+    this.eventsGateway.emitEventUpdated(id, updatedEvent);
+
+    this.logger.log(`Event ${id} published successfully`);
+
+    return updatedEvent;
+  }
+
+  async unpublishEvent(id: string, userId: string, userRole: UserRole) {
+    const event = await this.eventsRepository.findById(id);
+
+    if (!event) {
+      throw new NotFoundException(`Event with ID ${id} not found`);
+    }
+
+    // Check if user is owner or admin
+    if (event.organizerId !== userId && userRole !== UserRole.ADMIN) {
+      throw new ForbiddenException('You do not have permission to unpublish this event');
+    }
+
+    // Check if event is already unpublished
+    if (event.status === 'DRAFT') {
+      throw new BadRequestException('Event is already unpublished');
+    }
+
+    // Check if event is cancelled or completed
+    if (event.status === 'CANCELLED' || event.status === 'COMPLETED') {
+      throw new BadRequestException(`Cannot unpublish event with status: ${event.status}`);
+    }
+
+    // Update status to DRAFT
+    const updatedEvent = await this.eventsRepository.update(id, {
+      status: 'DRAFT',
+    });
+
+    // Emit WebSocket event
+    this.eventsGateway.emitEventUpdated(id, updatedEvent);
+
+    this.logger.log(`Event ${id} unpublished successfully`);
+
+    return updatedEvent;
+  }
+
+  async cancelEvent(id: string, userId: string, userRole: UserRole) {
+    const event = await this.eventsRepository.findById(id);
+
+    if (!event) {
+      throw new NotFoundException(`Event with ID ${id} not found`);
+    }
+
+    // Check if user is owner or admin
+    if (event.organizerId !== userId && userRole !== UserRole.ADMIN) {
+      throw new ForbiddenException('You do not have permission to cancel this event');
+    }
+
+    // Check if event is already cancelled
+    if (event.status === 'CANCELLED') {
+      throw new BadRequestException('Event is already cancelled');
+    }
+
+    // Check if event is completed
+    if (event.status === 'COMPLETED') {
+      throw new BadRequestException('Cannot cancel a completed event');
+    }
+
+    // Update status to CANCELLED
+    const updatedEvent = await this.eventsRepository.update(id, {
+      status: 'CANCELLED',
+    });
+
+    // Get all confirmed bookings for this event with user data
+    const bookings = await this.prisma.booking.findMany({
+      where: {
+        eventId: id,
+        status: 'CONFIRMED',
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            name: true,
+          },
+        },
+      },
+    });
+
+    // Process refunds and send cancellation emails
+    for (const booking of bookings) {
+      try {
+        // Process refund if payment was made
+        if (booking.paymentId && booking.paymentStatus === 'PAID') {
+          try {
+            await this.paymentService.createRefund(booking.paymentId);
+            // Update booking payment status
+            await this.bookingsRepository.update(booking.id, {
+              paymentStatus: 'REFUNDED',
+            });
+            this.logger.log(`Refund processed for booking ${booking.id}`);
+          } catch (refundError) {
+            this.logger.error(`Failed to refund booking ${booking.id}:`, refundError);
+            // Continue with other bookings even if one refund fails
+          }
+        }
+
+        // Update booking status to CANCELLED
+        await this.bookingsRepository.update(booking.id, {
+          status: 'CANCELLED',
+        });
+
+        // Update all tickets to CANCELLED
+        await this.prisma.ticket.updateMany({
+          where: { bookingId: booking.id },
+          data: { status: 'CANCELLED' },
+        });
+
+        // Queue cancellation email
+        try {
+          await this.emailQueue.add('cancellation', {
+            email: booking.user.email,
+            data: {
+              userName: booking.user.name,
+              bookingCode: booking.bookingCode,
+              eventTitle: event.title,
+              refundAmount: booking.totalAmount,
+            },
+          } as CancellationEmailJob);
+        } catch (emailError) {
+          this.logger.error(
+            `Failed to queue cancellation email for booking ${booking.id}:`,
+            emailError,
+          );
+        }
+
+        // Emit WebSocket event for booking cancellation
+        this.eventsGateway.emitBookingCancelled(booking.userId, booking.id);
+      } catch (error) {
+        this.logger.error(`Error processing cancellation for booking ${booking.id}:`, error);
+        // Continue with other bookings
+      }
+    }
+
+    // Emit WebSocket event for event cancellation
+    this.eventsGateway.emitEventCancelled(id);
+
+    this.logger.log(`Event ${id} cancelled successfully. Processed ${bookings.length} bookings.`);
+
+    return {
+      ...updatedEvent,
+      cancelledBookings: bookings.length,
     };
   }
 }
