@@ -127,21 +127,38 @@ export class ScheduledJobsService {
       const oneHourAgo = new Date();
       oneHourAgo.setHours(oneHourAgo.getHours() - 1);
 
-      const stats = await this.prisma.booking.aggregate({
-        where: {
-          createdAt: {
-            gte: oneHourAgo,
+      const where = {
+        createdAt: {
+          gte: oneHourAgo,
+        },
+      };
+
+      // Use separate aggregate queries to avoid Prisma SQL generation issues
+      const [countResult, revenueResult, quantityResult] = await Promise.all([
+        this.prisma.booking.aggregate({
+          where,
+          _count: true,
+        }),
+        this.prisma.booking.aggregate({
+          where,
+          _sum: {
+            totalAmount: true,
           },
-        },
-        _count: true,
-        _sum: {
-          totalAmount: true,
-          quantity: true,
-        },
-      });
+        }),
+        this.prisma.booking.aggregate({
+          where,
+          _sum: {
+            quantity: true,
+          },
+        }),
+      ]);
+
+      const count = countResult._count;
+      const revenue = revenueResult._sum.totalAmount || 0;
+      const quantity = quantityResult._sum.quantity || 0;
 
       this.logger.log(
-        `Analytics: Last hour - ${stats._count} bookings, $${stats._sum.totalAmount || 0} revenue, ${stats._sum.quantity || 0} tickets sold`,
+        `Analytics: Last hour - ${count} bookings, $${revenue} revenue, ${quantity} tickets sold`,
       );
 
       // Here you can store these stats in a separate analytics table or send to external service
