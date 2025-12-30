@@ -48,7 +48,7 @@ export class BookingsService {
   ) {}
 
   async createHold(userId: string, createHoldDto: CreateHoldDto): Promise<HoldResponseDto> {
-    const { eventId, ticketTypeId, quantity } = createHoldDto;
+    const { eventId, tickets } = createHoldDto;
 
     // 1. Verify event exists and is active
     const event = await this.eventsRepository.findById(eventId);
@@ -61,33 +61,45 @@ export class BookingsService {
       throw new BadRequestException('Event is not active for bookings');
     }
 
-    // 2. Verify ticket type exists and belongs to this event
-    const ticketType = await this.ticketTypesRepository.findById(ticketTypeId);
+    // 2. Validate all ticket types and check availability
+    const ticketItems: Array<{ ticketTypeId: string; quantity: number; price: number }> = [];
 
-    if (!ticketType || ticketType.eventId !== eventId) {
-      throw new NotFoundException('Ticket type not found for this event');
+    for (const ticketItem of tickets) {
+      const { ticketTypeId, quantity } = ticketItem;
+
+      // Verify ticket type exists and belongs to this event
+      const ticketType = await this.ticketTypesRepository.findById(ticketTypeId);
+
+      if (!ticketType || ticketType.eventId !== eventId) {
+        throw new NotFoundException(`Ticket type ${ticketTypeId} not found for this event`);
+      }
+
+      // Check availability (available tickets - active holds)
+      const activeHolds = await this.redis.getActiveHoldsForTicketType(eventId, ticketTypeId);
+      const availableAfterHolds = ticketType.available - activeHolds;
+
+      if (availableAfterHolds < quantity) {
+        throw new BadRequestException(
+          `Not enough tickets available for ${ticketType.name}. Available: ${availableAfterHolds}, Requested: ${quantity}`,
+        );
+      }
+
+      ticketItems.push({
+        ticketTypeId,
+        quantity,
+        price: ticketType.price,
+      });
     }
 
-    // 3. Check availability (available tickets - active holds)
-    const activeHolds = await this.redis.getActiveHoldsForTicketType(eventId, ticketTypeId);
-    const availableAfterHolds = ticketType.available - activeHolds;
-
-    if (availableAfterHolds < quantity) {
-      throw new BadRequestException(
-        `Not enough tickets available. Available: ${availableAfterHolds}, Requested: ${quantity}`,
-      );
-    }
-
-    // 4. Create hold in Redis (10 minutes TTL)
+    // 3. Create hold in Redis (10 minutes TTL) with all ticket types
     const holdId = await this.redis.holdSeats(
       eventId,
-      ticketTypeId,
       userId,
-      quantity,
+      ticketItems,
       600, // 10 minutes
     );
 
-    // 5. Get hold data to return
+    // 4. Get hold data to return
     const holdData = await this.redis.getHold(holdId);
 
     return {

@@ -41,17 +41,17 @@ export class RedisService implements OnModuleInit {
   // Seat hold operations
   async holdSeats(
     eventId: string,
-    ticketTypeId: string,
     userId: string,
-    quantity: number,
+    tickets: Array<{ ticketTypeId: string; quantity: number; price: number }>,
     ttlSeconds = 600,
   ): Promise<string> {
-    const holdId = `hold:${eventId}:${ticketTypeId}:${userId}:${Date.now()}`;
+    const holdId = `hold:${eventId}:${userId}:${Date.now()}`;
+    const totalAmount = tickets.reduce((sum, t) => sum + t.price * t.quantity, 0);
     const holdData = {
       eventId,
-      ticketTypeId,
       userId,
-      quantity,
+      tickets,
+      totalAmount,
       createdAt: new Date().toISOString(),
       expiresAt: new Date(Date.now() + ttlSeconds * 1000).toISOString(),
     };
@@ -71,7 +71,7 @@ export class RedisService implements OnModuleInit {
   }
 
   async getActiveHoldsForTicketType(eventId: string, ticketTypeId: string): Promise<number> {
-    const pattern = `hold:${eventId}:${ticketTypeId}:*`;
+    const pattern = `hold:${eventId}:*`;
     const keys = await this.redis.keys(pattern);
 
     let totalHeld = 0;
@@ -80,7 +80,13 @@ export class RedisService implements OnModuleInit {
       if (data) {
         // Upstash Redis automatically deserializes JSON
         const hold = data as any;
-        totalHeld += hold.quantity;
+        // Sum up quantities for this specific ticket type
+        if (hold.tickets && Array.isArray(hold.tickets)) {
+          const ticketItem = hold.tickets.find((t: any) => t.ticketTypeId === ticketTypeId);
+          if (ticketItem) {
+            totalHeld += ticketItem.quantity;
+          }
+        }
       }
     }
 
