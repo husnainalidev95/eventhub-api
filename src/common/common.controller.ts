@@ -40,7 +40,7 @@ export class CommonController {
     // Get all categories with event counts (only active events)
     const categories = await this.categoriesRepository.findAll();
 
-    // Filter and map to include only categories with active events
+    // Map to include only categories with active events count
     const categoriesWithCounts = await Promise.all(
       categories.map(async (category) => {
         // Count only active events for this category
@@ -56,17 +56,15 @@ export class CommonController {
       }),
     );
 
-    // Filter out categories with no active events and sort
-    const activeCategories = categoriesWithCounts
-      .filter((cat) => cat.eventCount > 0)
-      .sort((a, b) => {
-        if (b.eventCount !== a.eventCount) {
-          return b.eventCount - a.eventCount;
-        }
-        return a.name.localeCompare(b.name);
-      });
+    // Sort by event count (descending) then by name (ascending)
+    categoriesWithCounts.sort((a, b) => {
+      if (b.eventCount !== a.eventCount) {
+        return b.eventCount - a.eventCount;
+      }
+      return a.name.localeCompare(b.name);
+    });
 
-    return { categories: activeCategories };
+    return { categories: categoriesWithCounts };
   }
 
   @Get('cities')
