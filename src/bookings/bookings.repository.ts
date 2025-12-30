@@ -54,6 +54,15 @@ export class BookingsRepository extends BaseRepository<Booking> {
             name: true,
           },
         },
+        tickets: {
+          select: {
+            id: true,
+            ticketCode: true,
+            qrCodeData: true,
+            status: true,
+            createdAt: true,
+          },
+        },
       },
     });
   }
@@ -111,6 +120,15 @@ export class BookingsRepository extends BaseRepository<Booking> {
             id: true,
             name: true,
             price: true,
+          },
+        },
+        tickets: {
+          select: {
+            id: true,
+            ticketCode: true,
+            qrCodeData: true,
+            status: true,
+            createdAt: true,
           },
         },
       },
