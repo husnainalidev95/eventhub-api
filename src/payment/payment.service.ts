@@ -60,17 +60,15 @@ export class PaymentService {
       throw new BadRequestException('This hold does not belong to you');
     }
 
-    // Use the total amount already calculated in the hold (stored in cents already in DB but in dollars in Redis)
-    const amountInCents = Math.round(holdData.totalAmount * 100);
+    // Get ticket type to calculate amount
+    const ticketType = await this.ticketTypesRepository.findByIdWithEvent(holdData.ticketTypeId);
 
-    // Build ticket items string for metadata
-    const ticketItemsStr = JSON.stringify(
-      holdData.tickets.map((t: any) => ({
-        ticketTypeId: t.ticketTypeId,
-        quantity: t.quantity,
-        price: t.price,
-      })),
-    );
+    if (!ticketType) {
+      throw new BadRequestException('Ticket type not found');
+    }
+
+    // Calculate amount in cents
+    const amountInCents = Math.round(ticketType.price * holdData.quantity * 100);
 
     try {
       // Create payment intent
@@ -80,8 +78,11 @@ export class PaymentService {
         metadata: {
           holdId,
           userId,
-          eventId: holdData.eventId,
-          ticketItems: ticketItemsStr, // Store multiple ticket types
+          eventId: ticketType.eventId,
+          ticketTypeId: ticketType.id,
+          quantity: holdData.quantity.toString(),
+          eventTitle: ticketType.event.title,
+          ticketTypeName: ticketType.name,
         },
         automatic_payment_methods: {
           enabled: true,
@@ -133,7 +134,7 @@ export class PaymentService {
   }
 
   private async handlePaymentSuccess(paymentIntent: Stripe.PaymentIntent) {
-    const { holdId, userId, ticketItems } = paymentIntent.metadata;
+    const { holdId, userId, ticketTypeId, quantity } = paymentIntent.metadata;
 
     this.logger.log(`Payment succeeded for hold ${holdId}, creating booking...`);
 
@@ -146,91 +147,72 @@ export class PaymentService {
         return;
       }
 
-      // Parse ticket items from metadata
-      const ticketItemsParsed = JSON.parse(ticketItems);
+      // Get ticket type
+      const ticketType = await this.ticketTypesRepository.findById(ticketTypeId);
 
-      // Validate all ticket types have sufficient availability
-      for (const item of ticketItemsParsed) {
-        const ticketType = await this.ticketTypesRepository.findById(item.ticketTypeId);
-        if (!ticketType || ticketType.available < item.quantity) {
-          this.logger.error(`Insufficient tickets available for ticket type ${item.ticketTypeId}`);
-          // TODO: Handle refund
-          return;
-        }
+      if (!ticketType || ticketType.available < parseInt(quantity)) {
+        this.logger.error(`Insufficient tickets available for hold ${holdId}`);
+        // TODO: Handle refund
+        return;
       }
 
-      // Create booking in transaction (one booking with multiple ticket types)
+      // Create booking in transaction
       const booking = await this.prisma.$transaction(async (tx) => {
         const context = { trxPrisma: tx };
 
         // Generate unique booking code
         const bookingCode = `BK-${Date.now()}-${Math.random().toString(36).substring(2, 9).toUpperCase()}`;
 
-        // Get event ID from first ticket type
-        const firstTicketType = await this.ticketTypesRepository.findById(
-          ticketItemsParsed[0].ticketTypeId,
+        // Create booking
+        const newBooking = await this.bookingsRepository.create(
+          {
+            user: { connect: { id: userId } },
+            event: { connect: { id: ticketType.eventId } },
+            ticketType: { connect: { id: ticketTypeId } },
+            quantity: parseInt(quantity),
+            totalAmount: paymentIntent.amount / 100, // Convert cents to dollars
+            bookingCode,
+            holdId,
+            paymentId: paymentIntent.id,
+            paymentStatus: 'PAID',
+            status: 'CONFIRMED',
+          },
+          context,
         );
 
-        // For now, we'll create one booking record per ticket type
-        // This maintains compatibility with the current schema
-        const bookings = [];
-        const allTickets = [];
+        // Decrement available tickets
+        await this.ticketTypesRepository.decrementAvailable(
+          ticketTypeId,
+          parseInt(quantity),
+          context,
+        );
 
-        for (const item of ticketItemsParsed) {
-          const ticketType = await this.ticketTypesRepository.findById(item.ticketTypeId);
+        // Generate tickets
+        const tickets = [];
+        for (let i = 0; i < parseInt(quantity); i++) {
+          const ticketCode = `TIX-${Date.now()}-${Math.random().toString(36).substring(2, 9).toUpperCase()}`;
+          const qrCodeData = JSON.stringify({
+            bookingId: newBooking.id,
+            ticketCode,
+            ticketTypeId,
+            eventId: ticketType.eventId,
+            timestamp: new Date().toISOString(),
+          });
 
-          // Create booking for this ticket type
-          const newBooking = await this.bookingsRepository.create(
-            {
-              user: { connect: { id: userId } },
-              event: { connect: { id: firstTicketType.eventId } },
-              ticketType: { connect: { id: item.ticketTypeId } },
-              quantity: item.quantity,
-              totalAmount: item.price * item.quantity,
-              bookingCode: bookingCode, // Same booking code for all related bookings
-              holdId,
-              paymentId: paymentIntent.id,
-              paymentStatus: 'PAID',
-              status: 'CONFIRMED',
-            },
-            context,
-          );
-
-          bookings.push(newBooking);
-
-          // Decrement available tickets
-          await this.ticketTypesRepository.decrementAvailable(
-            item.ticketTypeId,
-            item.quantity,
-            context,
-          );
-
-          // Generate tickets for this ticket type
-          for (let i = 0; i < item.quantity; i++) {
-            const ticketCode = `TIX-${Date.now()}-${Math.random().toString(36).substring(2, 9).toUpperCase()}`;
-            const qrCodeData = JSON.stringify({
-              bookingId: newBooking.id,
-              ticketCode,
-              ticketTypeId: item.ticketTypeId,
-              eventId: firstTicketType.eventId,
-              timestamp: new Date().toISOString(),
-            });
-
-            allTickets.push({
-              bookingId: newBooking.id,
-              userId,
-              eventId: firstTicketType.eventId,
-              ticketTypeId: item.ticketTypeId,
-              ticketCode,
-              qrCodeData,
-              status: 'VALID',
-            });
-          }
+          tickets.push({
+            bookingId: newBooking.id,
+            userId,
+            eventId: ticketType.eventId,
+            ticketTypeId,
+            ticketCode,
+            qrCodeData,
+            status: 'VALID',
+          });
         }
 
-        await this.ticketsRepository.createMany(allTickets, context);
+        await this.ticketsRepository.createMany(tickets, context);
 
-        return bookings[0]; // Return first booking for logging
+        return newBooking;
       });
 
       // Release hold from Redis
@@ -240,18 +222,15 @@ export class PaymentService {
         `Booking ${booking.bookingCode} created successfully for payment ${paymentIntent.id}`,
       );
 
-      // Emit real-time updates for each ticket type
+      // Emit real-time updates
       this.eventsGateway.emitBookingCreated(userId, booking);
 
-      for (const item of ticketItemsParsed) {
-        const updatedTicketType = await this.ticketTypesRepository.findById(item.ticketTypeId);
-        const ticketType = await this.ticketTypesRepository.findById(item.ticketTypeId);
-        this.eventsGateway.emitTicketAvailabilityUpdate(
-          ticketType.eventId,
-          item.ticketTypeId,
-          updatedTicketType.available,
-        );
-      }
+      const updatedTicketType = await this.ticketTypesRepository.findById(ticketTypeId);
+      this.eventsGateway.emitTicketAvailabilityUpdate(
+        ticketType.eventId,
+        ticketTypeId,
+        updatedTicketType.available,
+      );
 
       // TODO: Send confirmation and ticket emails via EmailService
     } catch (error) {
