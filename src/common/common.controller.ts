@@ -95,7 +95,7 @@ export class CommonController {
     // Get all cities with event counts (only active events)
     const cities = await this.citiesRepository.findAll();
 
-    // Filter and map to include only cities with active events
+    // Map to include only cities with active events count
     const citiesWithCounts = await Promise.all(
       cities.map(async (city) => {
         // Count only active events for this city
@@ -110,16 +110,14 @@ export class CommonController {
       }),
     );
 
-    // Filter out cities with no active events and sort
-    const activeCities = citiesWithCounts
-      .filter((city) => city.eventCount > 0)
-      .sort((a, b) => {
-        if (b.eventCount !== a.eventCount) {
-          return b.eventCount - a.eventCount;
-        }
-        return a.name.localeCompare(b.name);
-      });
+    // Sort by event count (descending) then by name (ascending)
+    citiesWithCounts.sort((a, b) => {
+      if (b.eventCount !== a.eventCount) {
+        return b.eventCount - a.eventCount;
+      }
+      return a.name.localeCompare(b.name);
+    });
 
-    return { cities: activeCities };
+    return { cities: citiesWithCounts };
   }
 }
