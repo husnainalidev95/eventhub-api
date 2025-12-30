@@ -22,4 +22,3 @@ export class GetEventBookingsQueryDto {
   @Min(1)
   limit?: number = 10;
 }
-

@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ForbiddenException,
+  BadRequestException,
+} from '@nestjs/common';
 import { UserRole, BookingStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { UsersRepository } from '../auth/users.repository';
@@ -193,20 +198,26 @@ export class OrganizerService {
     const totalRevenue = bookings.reduce((sum, booking) => sum + booking.totalAmount, 0);
 
     // Calculate revenue by event
-    const revenueByEvent = bookings.reduce((acc, booking) => {
-      const eventId = booking.eventId;
-      if (!acc[eventId]) {
-        acc[eventId] = {
-          eventId,
-          eventTitle: booking.event.title,
-          revenue: 0,
-          bookingCount: 0,
-        };
-      }
-      acc[eventId].revenue += booking.totalAmount;
-      acc[eventId].bookingCount += 1;
-      return acc;
-    }, {} as Record<string, { eventId: string; eventTitle: string; revenue: number; bookingCount: number }>);
+    const revenueByEvent = bookings.reduce(
+      (acc, booking) => {
+        const eventId = booking.eventId;
+        if (!acc[eventId]) {
+          acc[eventId] = {
+            eventId,
+            eventTitle: booking.event.title,
+            revenue: 0,
+            bookingCount: 0,
+          };
+        }
+        acc[eventId].revenue += booking.totalAmount;
+        acc[eventId].bookingCount += 1;
+        return acc;
+      },
+      {} as Record<
+        string,
+        { eventId: string; eventTitle: string; revenue: number; bookingCount: number }
+      >,
+    );
 
     // Calculate revenue by ticket type
     const revenueByTicketType = await this.prisma.booking.groupBy({
@@ -407,10 +418,13 @@ export class OrganizerService {
     });
 
     // Calculate booking status distribution
-    const statusDistribution = bookings.reduce((acc, booking) => {
-      acc[booking.status] = (acc[booking.status] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
+    const statusDistribution = bookings.reduce(
+      (acc, booking) => {
+        acc[booking.status] = (acc[booking.status] || 0) + 1;
+        return acc;
+      },
+      {} as Record<string, number>,
+    );
 
     // Calculate peak booking times (by hour of day)
     const peakTimes: Record<number, number> = {};
@@ -452,4 +466,3 @@ export class OrganizerService {
     };
   }
 }
-

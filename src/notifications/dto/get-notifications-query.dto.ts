@@ -39,4 +39,3 @@ export class GetNotificationsQueryDto {
   @Max(100)
   limit?: number = 10;
 }
-

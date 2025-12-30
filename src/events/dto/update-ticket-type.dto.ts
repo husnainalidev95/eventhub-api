@@ -7,7 +7,7 @@ export class UpdateTicketTypeDto {
   @IsString()
   name?: string;
 
-  @ApiProperty({ example: 150.00, description: 'Ticket price', required: false })
+  @ApiProperty({ example: 150.0, description: 'Ticket price', required: false })
   @IsOptional()
   @IsNumber()
   @Min(0)
@@ -28,4 +28,3 @@ export class UpdateTicketTypeDto {
   @IsString()
   description?: string;
 }
-

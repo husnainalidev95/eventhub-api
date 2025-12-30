@@ -11,4 +11,3 @@ import { CitiesRepository } from './repositories/cities.repository';
   exports: [CategoriesRepository, CitiesRepository],
 })
 export class CommonModule {}
-

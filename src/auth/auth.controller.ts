@@ -94,7 +94,10 @@ export class AuthController {
   @Post('verify-email')
   @ApiOperation({ summary: 'Verify email address with token' })
   @ApiResponse({ status: 200, description: 'Email verified successfully' })
-  @ApiResponse({ status: 400, description: 'Bad Request - Invalid or expired token, or email already verified' })
+  @ApiResponse({
+    status: 400,
+    description: 'Bad Request - Invalid or expired token, or email already verified',
+  })
   async verifyEmail(@Body() verifyEmailDto: VerifyEmailDto): Promise<{ message: string }> {
     return this.authService.verifyEmail(verifyEmailDto);
   }
@@ -112,7 +115,10 @@ export class AuthController {
   @Post('reset-password')
   @ApiOperation({ summary: 'Reset password with token' })
   @ApiResponse({ status: 200, description: 'Password reset successfully' })
-  @ApiResponse({ status: 400, description: 'Bad Request - Invalid or expired token, or weak password' })
+  @ApiResponse({
+    status: 400,
+    description: 'Bad Request - Invalid or expired token, or weak password',
+  })
   async resetPassword(@Body() resetPasswordDto: ResetPasswordDto): Promise<{ message: string }> {
     return this.authService.resetPassword(resetPasswordDto);
   }

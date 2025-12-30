@@ -21,4 +21,3 @@ export class UpdateCityDto {
   @MaxLength(100)
   country?: string;
 }
-

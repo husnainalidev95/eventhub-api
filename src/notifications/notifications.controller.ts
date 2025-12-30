@@ -19,7 +19,11 @@ interface AuthenticatedUser {
   email: string;
   role: UserRole;
 }
-import { GetNotificationsQueryDto, NotificationsListResponseDto, NotificationResponseDto } from './dto';
+import {
+  GetNotificationsQueryDto,
+  NotificationsListResponseDto,
+  NotificationResponseDto,
+} from './dto';
 
 @ApiTags('Notifications')
 @Controller('notifications')
@@ -77,4 +81,3 @@ export class NotificationsController {
     return this.notificationsService.markAllAsRead(user.id);
   }
 }
-

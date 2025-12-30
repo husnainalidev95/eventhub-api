@@ -602,7 +602,7 @@ export class BookingsService {
     }
 
     const paymentStatus = booking.paymentStatus as string | null | undefined;
-    
+
     // Check if already refunded
     if (paymentStatus === 'REFUNDED') {
       throw new BadRequestException('Booking has already been refunded');

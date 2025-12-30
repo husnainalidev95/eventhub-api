@@ -29,4 +29,3 @@ export class UpdateProfileDto {
   @IsOptional()
   avatar?: string;
 }
-

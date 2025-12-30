@@ -34,7 +34,8 @@ export class ContactService {
       this.logger.log(`Contact form submitted by ${contactFormDto.name} (${contactFormDto.email})`);
 
       return {
-        message: 'Thank you for contacting us! We have received your message and will get back to you soon.',
+        message:
+          'Thank you for contacting us! We have received your message and will get back to you soon.',
       };
     } catch (error) {
       this.logger.error('Error processing contact form', error);
@@ -42,4 +43,3 @@ export class ContactService {
     }
   }
 }
-

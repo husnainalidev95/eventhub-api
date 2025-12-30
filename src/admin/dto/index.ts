@@ -10,4 +10,3 @@ export * from './get-categories-query.dto';
 export * from './create-city.dto';
 export * from './update-city.dto';
 export * from './get-cities-query.dto';
-

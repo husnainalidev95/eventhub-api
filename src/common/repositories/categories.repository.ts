@@ -115,4 +115,3 @@ export class CategoriesRepository extends BaseRepository<Category> {
     });
   }
 }
-

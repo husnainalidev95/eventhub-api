@@ -45,7 +45,10 @@ export class NotificationsRepository extends BaseRepository<Notification> {
     });
   }
 
-  async count(filter?: { userId?: string; isRead?: boolean }, context?: WithPrisma): Promise<number> {
+  async count(
+    filter?: { userId?: string; isRead?: boolean },
+    context?: WithPrisma,
+  ): Promise<number> {
     const where: Prisma.NotificationWhereInput = {};
 
     if (filter?.userId) {
@@ -67,7 +70,11 @@ export class NotificationsRepository extends BaseRepository<Notification> {
     });
   }
 
-  async update(id: string, data: Prisma.NotificationUpdateInput, context?: WithPrisma): Promise<Notification> {
+  async update(
+    id: string,
+    data: Prisma.NotificationUpdateInput,
+    context?: WithPrisma,
+  ): Promise<Notification> {
     return this.getPrismaClient(context).notification.update({
       where: { id },
       data,
@@ -94,4 +101,3 @@ export class NotificationsRepository extends BaseRepository<Notification> {
     return result.count;
   }
 }
-

@@ -29,4 +29,3 @@ export class GetRevenueAnalyticsQueryDto {
   @IsDateString()
   endDate?: string;
 }
-

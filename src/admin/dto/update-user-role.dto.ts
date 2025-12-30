@@ -16,4 +16,3 @@ export class UpdateUserRoleDto {
   @IsString()
   companyName?: string;
 }
-

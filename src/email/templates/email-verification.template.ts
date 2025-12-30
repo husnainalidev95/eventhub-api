@@ -1,7 +1,4 @@
-export const emailVerificationTemplate = (data: {
-  userName: string;
-  verificationLink: string;
-}) => {
+export const emailVerificationTemplate = (data: { userName: string; verificationLink: string }) => {
   return `
 <!DOCTYPE html>
 <html>
@@ -45,4 +42,3 @@ export const emailVerificationTemplate = (data: {
 </html>
 `;
 };
-

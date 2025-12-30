@@ -19,4 +19,3 @@ export class ResetPasswordDto {
   @IsNotEmpty()
   newPassword: string;
 }
-

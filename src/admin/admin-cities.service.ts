@@ -61,7 +61,11 @@ export class AdminCitiesService {
     const { name, state, country = 'USA' } = createCityDto;
 
     // Check if city already exists (unique constraint: name + state + country)
-    const existing = await this.citiesRepository.findByNameStateCountry(name, state || null, country);
+    const existing = await this.citiesRepository.findByNameStateCountry(
+      name,
+      state || null,
+      country,
+    );
     if (existing) {
       throw new ConflictException(
         `City "${name}"${state ? `, ${state}` : ''}, ${country} already exists`,
@@ -91,11 +95,7 @@ export class AdminCitiesService {
     const finalState = state !== undefined ? state : city.state;
     const finalCountry = country || city.country;
 
-    if (
-      finalName !== city.name ||
-      finalState !== city.state ||
-      finalCountry !== city.country
-    ) {
+    if (finalName !== city.name || finalState !== city.state || finalCountry !== city.country) {
       const existing = await this.citiesRepository.findByNameStateCountry(
         finalName,
         finalState || null,
@@ -135,4 +135,3 @@ export class AdminCitiesService {
     await this.citiesRepository.delete(id);
   }
 }
-

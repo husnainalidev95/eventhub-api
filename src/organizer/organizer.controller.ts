@@ -103,4 +103,3 @@ export class OrganizerController {
     return this.organizerService.getBookingAnalytics(user.id, query);
   }
 }
-

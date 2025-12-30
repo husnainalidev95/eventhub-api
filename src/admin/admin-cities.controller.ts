@@ -11,12 +11,7 @@ import {
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
-import {
-  ApiTags,
-  ApiOperation,
-  ApiResponse,
-  ApiBearerAuth,
-} from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { AdminCitiesService } from './admin-cities.service';
 import { CreateCityDto, UpdateCityDto, GetCitiesQueryDto } from './dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -84,4 +79,3 @@ export class AdminCitiesController {
     await this.adminCitiesService.delete(id);
   }
 }
-

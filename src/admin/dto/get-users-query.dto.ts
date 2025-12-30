@@ -18,7 +18,12 @@ export class GetUsersQueryDto {
   @Min(1)
   limit?: number = 10;
 
-  @ApiProperty({ example: 'ORGANIZER', description: 'Filter by role', enum: UserRole, required: false })
+  @ApiProperty({
+    example: 'ORGANIZER',
+    description: 'Filter by role',
+    enum: UserRole,
+    required: false,
+  })
   @IsOptional()
   @IsEnum(UserRole)
   role?: UserRole;
@@ -34,4 +39,3 @@ export class GetUsersQueryDto {
   @IsString()
   search?: string;
 }
-

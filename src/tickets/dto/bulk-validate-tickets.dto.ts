@@ -12,4 +12,3 @@ export class BulkValidateTicketsDto {
   @IsString({ each: true })
   ticketCodes: string[];
 }
-

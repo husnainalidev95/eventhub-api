@@ -20,7 +20,11 @@ export class OrganizerPublicResponseDto {
   @ApiProperty({ example: 'https://www.eventco.com', description: 'Website URL', required: false })
   website?: string;
 
-  @ApiProperty({ example: 'https://res.cloudinary.com/.../logo.jpg', description: 'Logo URL', required: false })
+  @ApiProperty({
+    example: 'https://res.cloudinary.com/.../logo.jpg',
+    description: 'Logo URL',
+    required: false,
+  })
   avatar?: string;
 
   @ApiProperty({ example: 15, description: 'Total number of events created' })
@@ -35,4 +39,3 @@ export class OrganizerPublicResponseDto {
   @ApiProperty({ example: 5000.0, description: 'Total revenue generated' })
   totalRevenue: number;
 }
-

@@ -12,7 +12,8 @@ export class UpdateOrganizerProfileDto {
   companyName?: string;
 
   @ApiPropertyOptional({
-    example: 'We are a leading event management company specializing in tech conferences and music festivals.',
+    example:
+      'We are a leading event management company specializing in tech conferences and music festivals.',
     description: 'Organizer description or bio',
   })
   @IsOptional()
@@ -36,4 +37,3 @@ export class UpdateOrganizerProfileDto {
   @IsUrl({}, { message: 'Logo must be a valid URL' })
   logo?: string;
 }
-

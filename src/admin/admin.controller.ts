@@ -9,13 +9,7 @@ import {
   Body,
   UseGuards,
 } from '@nestjs/common';
-import {
-  ApiTags,
-  ApiOperation,
-  ApiResponse,
-  ApiBearerAuth,
-  ApiQuery,
-} from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { AdminService } from './admin.service';
 import {
   GetUsersQueryDto,
@@ -164,4 +158,3 @@ export class AdminController {
     return this.adminService.getStatistics(query);
   }
 }
-

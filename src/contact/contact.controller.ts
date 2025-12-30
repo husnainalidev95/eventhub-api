@@ -19,7 +19,8 @@ export class ContactController {
       properties: {
         message: {
           type: 'string',
-          example: 'Thank you for contacting us! We have received your message and will get back to you soon.',
+          example:
+            'Thank you for contacting us! We have received your message and will get back to you soon.',
         },
       },
     },
@@ -30,4 +31,3 @@ export class ContactController {
     return this.contactService.submitContactForm(contactFormDto);
   }
 }
-

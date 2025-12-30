@@ -1,6 +1,10 @@
 import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { NotificationsRepository } from './notifications.repository';
-import { GetNotificationsQueryDto, NotificationsListResponseDto, NotificationResponseDto } from './dto';
+import {
+  GetNotificationsQueryDto,
+  NotificationsListResponseDto,
+  NotificationResponseDto,
+} from './dto';
 
 @Injectable()
 export class NotificationsService {
@@ -128,4 +132,3 @@ export class NotificationsService {
     };
   }
 }
-

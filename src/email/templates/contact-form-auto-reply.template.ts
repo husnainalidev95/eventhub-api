@@ -1,7 +1,4 @@
-export const contactFormAutoReplyTemplate = (data: {
-  name: string;
-  subject: string;
-}) => {
+export const contactFormAutoReplyTemplate = (data: { name: string; subject: string }) => {
   return `
 <!DOCTYPE html>
 <html>
@@ -46,4 +43,3 @@ export const contactFormAutoReplyTemplate = (data: {
 </html>
 `;
 };
-

@@ -11,18 +11,9 @@ import {
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
-import {
-  ApiTags,
-  ApiOperation,
-  ApiResponse,
-  ApiBearerAuth,
-} from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { AdminCategoriesService } from './admin-categories.service';
-import {
-  CreateCategoryDto,
-  UpdateCategoryDto,
-  GetCategoriesQueryDto,
-} from './dto';
+import { CreateCategoryDto, UpdateCategoryDto, GetCategoriesQueryDto } from './dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -88,4 +79,3 @@ export class AdminCategoriesController {
     await this.adminCategoriesService.delete(id);
   }
 }
-

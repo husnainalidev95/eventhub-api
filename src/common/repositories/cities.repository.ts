@@ -131,4 +131,3 @@ export class CitiesRepository extends BaseRepository<City> {
     });
   }
 }
-

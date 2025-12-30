@@ -24,4 +24,3 @@ export class NotificationsListResponseDto {
     unreadCount: number;
   };
 }
-

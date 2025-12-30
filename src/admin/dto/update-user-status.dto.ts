@@ -15,4 +15,3 @@ export class UpdateUserStatusDto {
   @IsString()
   reason?: string;
 }
-

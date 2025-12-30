@@ -34,4 +34,3 @@ export class CreateCategoryDto {
   @MaxLength(500)
   description?: string;
 }
-

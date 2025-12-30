@@ -44,7 +44,10 @@ export class TicketsController {
   @Post(':code/validate')
   @ApiOperation({ summary: 'Validate a single ticket by code' })
   @ApiResponse({ status: 200, description: 'Ticket validated successfully' })
-  @ApiResponse({ status: 400, description: 'Bad Request - Ticket invalid, expired, or already used' })
+  @ApiResponse({
+    status: 400,
+    description: 'Bad Request - Ticket invalid, expired, or already used',
+  })
   @ApiResponse({ status: 404, description: 'Ticket not found' })
   async validateTicket(@Param('code') code: string) {
     return this.ticketsService.validateTicket(code);
@@ -135,7 +138,10 @@ export class TicketsController {
     },
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  @ApiResponse({ status: 403, description: 'Forbidden - Not ticket owner, event organizer, or admin' })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - Not ticket owner, event organizer, or admin',
+  })
   @ApiResponse({ status: 404, description: 'Ticket not found' })
   async resendTicketEmail(@Param('code') code: string, @Request() req) {
     return this.ticketsService.resendTicketEmail(code, req.user.id, req.user.role);

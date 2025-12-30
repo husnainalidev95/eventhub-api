@@ -37,4 +37,3 @@ export class GetBookingAnalyticsQueryDto {
   @IsDateString()
   endDate?: string;
 }
-

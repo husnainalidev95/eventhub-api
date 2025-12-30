@@ -157,4 +157,3 @@ export class AdminCategoriesService {
       .replace(/^-+|-+$/g, ''); // Remove leading/trailing hyphens
   }
 }
-

@@ -25,4 +25,3 @@ import { EventsRepository } from '../events/events.repository';
   exports: [AdminService],
 })
 export class AdminModule {}
-

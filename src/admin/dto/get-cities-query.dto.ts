@@ -32,4 +32,3 @@ export class GetCitiesQueryDto {
   @Min(1)
   limit?: number = 10;
 }
-

@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { Prisma, TicketStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { TicketResponseDto } from './dto/ticket-response.dto';
@@ -170,7 +175,12 @@ export class TicketsService {
     };
   }
 
-  async bulkValidateTickets(eventId: string, userId: string, userRole: string, ticketCodes: string[]) {
+  async bulkValidateTickets(
+    eventId: string,
+    userId: string,
+    userRole: string,
+    ticketCodes: string[],
+  ) {
     // Verify event exists and user has permission
     const event = await this.eventsRepository.findById(eventId);
 

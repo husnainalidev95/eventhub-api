@@ -39,4 +39,3 @@ export class GetStatisticsQueryDto {
   @IsDateString()
   endDate?: string;
 }
-

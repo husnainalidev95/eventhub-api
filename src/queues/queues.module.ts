@@ -19,11 +19,11 @@ import { PrismaModule } from '../prisma/prisma.module';
         // Extract from REST URL or use explicit config
         const restUrl = configService.get<string>('UPSTASH_REDIS_REST_URL');
         const restToken = configService.get<string>('UPSTASH_REDIS_REST_TOKEN');
-        
+
         if (restUrl && restToken) {
           // Extract hostname from REST URL (e.g., https://happy-grubworm-42927.upstash.io)
           const hostname = restUrl.replace('https://', '').replace('http://', '');
-          
+
           return {
             redis: {
               host: hostname,
@@ -36,7 +36,7 @@ import { PrismaModule } from '../prisma/prisma.module';
             },
           };
         }
-        
+
         // Fallback to local Redis or explicit config
         const redisUrl = configService.get<string>('REDIS_URL');
         if (redisUrl) {
@@ -55,7 +55,7 @@ import { PrismaModule } from '../prisma/prisma.module';
             // Invalid URL, fall through to default
           }
         }
-        
+
         // Default to local Redis
         return {
           redis: {

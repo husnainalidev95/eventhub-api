@@ -1,7 +1,4 @@
-export const passwordResetTemplate = (data: {
-  userName: string;
-  resetLink: string;
-}) => {
+export const passwordResetTemplate = (data: { userName: string; resetLink: string }) => {
   return `
 <!DOCTYPE html>
 <html>
@@ -50,4 +47,3 @@ export const passwordResetTemplate = (data: {
 </html>
 `;
 };
-

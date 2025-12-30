@@ -12,4 +12,3 @@ export class UpdateBookingStatusDto {
   @IsNotEmpty()
   status: BookingStatus;
 }
-

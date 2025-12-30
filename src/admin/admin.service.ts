@@ -487,9 +487,7 @@ export class AdminService {
     });
 
     // Sort by booking count and take top 5
-    const topEvents = allEvents
-      .sort((a, b) => b._count.bookings - a._count.bookings)
-      .slice(0, 5);
+    const topEvents = allEvents.sort((a, b) => b._count.bookings - a._count.bookings).slice(0, 5);
 
     // Get top organizers by revenue
     const topOrganizers = await this.prisma.user.findMany({
@@ -519,8 +517,7 @@ export class AdminService {
       .map((organizer) => {
         const revenue = organizer.events.reduce((sum, event) => {
           return (
-            sum +
-            event.bookings.reduce((eventSum, booking) => eventSum + booking.totalAmount, 0)
+            sum + event.bookings.reduce((eventSum, booking) => eventSum + booking.totalAmount, 0)
           );
         }, 0);
 
@@ -586,4 +583,3 @@ export class AdminService {
     };
   }
 }
-

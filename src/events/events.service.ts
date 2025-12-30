@@ -608,7 +608,10 @@ export class EventsService {
             },
           );
         } catch (notifError) {
-          this.logger.error(`Failed to create cancellation notification for booking ${booking.bookingCode}:`, notifError);
+          this.logger.error(
+            `Failed to create cancellation notification for booking ${booking.bookingCode}:`,
+            notifError,
+          );
         }
 
         // Emit WebSocket event for booking cancellation
@@ -650,17 +653,18 @@ export class EventsService {
 
     // Calculate booking statistics
     const totalBookings = bookings.length;
-    const bookingsByStatus = bookings.reduce((acc, booking) => {
-      acc[booking.status] = (acc[booking.status] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
+    const bookingsByStatus = bookings.reduce(
+      (acc, booking) => {
+        acc[booking.status] = (acc[booking.status] || 0) + 1;
+        return acc;
+      },
+      {} as Record<string, number>,
+    );
 
     // Calculate revenue
     const totalRevenue = bookings
       .filter(
-        (b) =>
-          (b.status === 'CONFIRMED' || b.status === 'COMPLETED') &&
-          b.paymentStatus === 'PAID',
+        (b) => (b.status === 'CONFIRMED' || b.status === 'COMPLETED') && b.paymentStatus === 'PAID',
       )
       .reduce((sum, booking) => sum + booking.totalAmount, 0);
 
@@ -676,10 +680,13 @@ export class EventsService {
     });
 
     const totalTickets = tickets.length;
-    const ticketsByStatus = tickets.reduce((acc, ticket) => {
-      acc[ticket.status] = (acc[ticket.status] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
+    const ticketsByStatus = tickets.reduce(
+      (acc, ticket) => {
+        acc[ticket.status] = (acc[ticket.status] || 0) + 1;
+        return acc;
+      },
+      {} as Record<string, number>,
+    );
 
     // Calculate booking trends over time (by day)
     const bookingTrends: Record<string, { count: number; revenue: number }> = {};
@@ -700,8 +707,7 @@ export class EventsService {
     });
 
     // Calculate demographics
-    const avgTicketsPerBooking =
-      totalBookings > 0 ? totalTickets / totalBookings : 0;
+    const avgTicketsPerBooking = totalBookings > 0 ? totalTickets / totalBookings : 0;
 
     // Get unique users who booked
     const uniqueUsers = new Set(bookings.map((b) => b.userId));
@@ -712,8 +718,7 @@ export class EventsService {
     bookings.forEach((booking) => {
       userBookingCounts[booking.userId] = (userBookingCounts[booking.userId] || 0) + 1;
     });
-    const returningCustomers = Object.values(userBookingCounts).filter((count) => count > 1)
-      .length;
+    const returningCustomers = Object.values(userBookingCounts).filter((count) => count > 1).length;
 
     // Revenue breakdown by ticket type
     const revenueByTicketType = await this.prisma.booking.groupBy({
@@ -887,7 +892,9 @@ export class EventsService {
 
     // Verify event ownership or admin
     if (event.organizerId !== userId && userRole !== UserRole.ADMIN) {
-      throw new ForbiddenException('You do not have permission to toggle featured status for this event');
+      throw new ForbiddenException(
+        'You do not have permission to toggle featured status for this event',
+      );
     }
 
     // Toggle featured status
